@@ -48,7 +48,7 @@ lavalink:
     ratelimit:
       ipBlocks: ["2a01:4f8:c2c:ca2e::/64"]
       excludedIps: ["2a01:4f8:c2c:ca2e::1"]
-      strategy: "RotateOnBan"
+      strategy: "LoadBalance"
       searchTriggersFail: true
       retryLimit: -1
 
@@ -63,15 +63,11 @@ plugins:
     allowDirectVideoIds: true
     allowDirectPlaylistIds: true
     clients:
-      - TV
-      - MWEB
-      - WEB
-      - MUSIC
-      - WEBEMBEDDED
-      - ANDROID_VR
       - TVHTML5_SIMPLY
-      - IOS
-      - ANDROID_MUSIC
+      - ANDROID_VR
+      - WEBEMBEDDED
+      - MUSIC
+      - WEB
 
   lavasrc:
     providers:
