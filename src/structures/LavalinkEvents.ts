@@ -109,19 +109,51 @@ export function registerLavalinkEvents(client: MusicClient): void {
         await channel.send(`Audio stream got stuck for **${track?.info.title || "Unknown"}**. Skipping to next...`).catch(() => null);
       }
     }
-    await player.skip().catch(() => null);
+    if (player.queue.tracks.length > 0) {
+      await player.skip().catch(() => null);
+    } else {
+      await player.stopPlaying(true, false).catch(() => null);
+    }
   });
 
   // Track Error
   lavalink.on("trackError", async (player: Player, track: Track | UnresolvedTrack | null, payload) => {
     console.error(`[Lavalink] Track error:`, payload);
+
+    // If a YouTube track fails (e.g. rate limit, signature cipher change, datacenter block),
+    // automatically fallback to SoundCloud so music playback is never interrupted.
+    if (track && "info" in track && track.info.sourceName === "youtube") {
+      try {
+        const query = `${track.info.title} ${track.info.author || ""}`.trim();
+        const scRes = await player.search({ query, source: "scsearch" }, track.requester);
+        if (scRes && scRes.tracks && scRes.tracks.length > 0) {
+          const fallbackTrack = scRes.tracks[0];
+          console.log(`[Lavalink] Auto-fallback to SoundCloud for: "${track.info.title}"`);
+          if (player.textChannelId) {
+            const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
+            if (channel) {
+              await channel.send(`YouTube playback restricted for **${track.info.title}**. Streaming via SoundCloud fallback...`).catch(() => null);
+            }
+          }
+          await player.play({ clientTrack: fallbackTrack });
+          return;
+        }
+      } catch (fallbackErr) {
+        console.warn("[Lavalink] SoundCloud auto-fallback failed:", fallbackErr);
+      }
+    }
+
     if (player.textChannelId) {
       const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
       if (channel) {
         await channel.send(`Failed to play track: **${(track as any)?.info?.title || "Unknown"}**.`).catch(() => null);
       }
     }
-    await player.skip().catch(() => null);
+    if (player.queue.tracks.length > 0) {
+      await player.skip().catch(() => null);
+    } else {
+      await player.stopPlaying(true, false).catch(() => null);
+    }
   });
 
   // Player disconnected from Voice Channel
