@@ -12,6 +12,11 @@ export function registerLavalinkEvents(client: MusicClient): void {
   lavalink.on("trackStart", async (player: Player, track: Track | null) => {
     if (!track || !player.textChannelId) return;
 
+    // Record when this track actually started playing
+    const customData = getCustomData(player);
+    customData.trackStartedAt = Date.now();
+    setCustomData(player, customData);
+
     try {
       const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
       if (!channel) return;
@@ -120,20 +125,27 @@ export function registerLavalinkEvents(client: MusicClient): void {
   lavalink.on("trackError", async (player: Player, track: Track | UnresolvedTrack | null, payload) => {
     console.error(`[Lavalink] Track error:`, payload);
 
-    // Suppress false errors: if the track already played for more than 3 seconds,
-    // the error is a mid-stream hiccup (e.g. YouTube rate limit at end of track),
-    // not a true playback failure. Don't send an error message to the user.
-    const trackPosition = (player as any).position ?? 0;
+    // Suppress false errors: if the track already started playing more than 3 seconds ago,
+    // this is a mid-stream hiccup (e.g. YouTube stream closing after playback), not a true failure.
+    // player.position is reset to 0 before the event fires, so we use our own timestamp.
+    const customData = getCustomData(player);
+    const elapsed = customData.trackStartedAt ? Date.now() - customData.trackStartedAt : 0;
     const severity = payload?.exception?.severity ?? "";
 
-    if (trackPosition > 3000) {
-      console.log(`[Lavalink] trackError suppressed for "${(track as any)?.info?.title}" — track already played ${Math.round(trackPosition / 1000)}s (severity: ${severity})`);
-      // If queue has more tracks, let lavalink-client advance naturally; otherwise stop cleanly.
+    if (elapsed > 3000) {
+      console.log(`[Lavalink] trackError suppressed for "${(track as any)?.info?.title}" — played for ${Math.round(elapsed / 1000)}s (severity: ${severity})`);
+      // Clear the start timestamp
+      customData.trackStartedAt = undefined;
+      setCustomData(player, customData);
       if (player.queue.tracks.length === 0) {
         await player.stopPlaying(true, false).catch(() => null);
       }
       return;
     }
+
+    // Track never really played — reset timestamp
+    customData.trackStartedAt = undefined;
+    setCustomData(player, customData);
 
     // If a YouTube track fails at the START (never played), try SoundCloud fallback.
     if (track && "info" in track && track.info.sourceName === "youtube") {

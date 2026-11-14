@@ -23,6 +23,7 @@ export interface PlayerCustomData {
   autoplay?: boolean;
   lastMessageId?: string;
   voteSkips?: Set<string>;
+  trackStartedAt?: number; // Unix ms timestamp when current track started
 }
 
 export function getCustomData(player: any): PlayerCustomData {
