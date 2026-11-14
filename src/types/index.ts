@@ -23,8 +23,9 @@ export interface PlayerCustomData {
   autoplay?: boolean;
   lastMessageId?: string;
   voteSkips?: Set<string>;
-  trackStartedAt?: number;       // Unix ms when current track started playing
+  trackStartedAt?: number;        // Unix ms when current track started playing
   lastCleanEndId?: string | null; // Identifier of track that last ended via trackEnd (cleanly)
+  queueEndedAt?: number;          // Unix ms when queueEnd last fired
 }
 
 export function getCustomData(player: any): PlayerCustomData {

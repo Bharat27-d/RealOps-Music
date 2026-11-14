@@ -56,6 +56,10 @@ export function registerLavalinkEvents(client: MusicClient): void {
 
     const customData = getCustomData(player);
 
+    // Stamp the time queueEnd fired — used to suppress stale trackError events
+    customData.queueEndedAt = Date.now();
+    setCustomData(player, customData);
+
     // Check if Autoplay is enabled
     if (customData.autoplay && track && "info" in track) {
       try {
@@ -131,7 +135,16 @@ export function registerLavalinkEvents(client: MusicClient): void {
     const customData = getCustomData(player);
 
     // ── SUPPRESS FALSE ERRORS ──────────────────────────────────────────────
-    // Case 1: trackEnd already fired for this exact track (clean end + stale stream error from YouTube)
+    // Case 1: queueEnd already fired (track played to completion — stale YouTube stream teardown)
+    const timeSinceQueueEnd = customData.queueEndedAt ? Date.now() - customData.queueEndedAt : Infinity;
+    if (timeSinceQueueEnd < 15000) {
+      console.log(`[Lavalink] trackError suppressed — queueEnd fired ${Math.round(timeSinceQueueEnd / 1000)}s ago for "${title}"`);
+      customData.queueEndedAt = undefined;
+      setCustomData(player, customData);
+      return;
+    }
+
+    // Case 2: trackEnd already fired for this exact track identifier
     if (identifier && customData.lastCleanEndId === identifier) {
       console.log(`[Lavalink] trackError suppressed — trackEnd already fired for "${title}" (${identifier})`);
       customData.lastCleanEndId = undefined;
@@ -139,9 +152,9 @@ export function registerLavalinkEvents(client: MusicClient): void {
       return;
     }
 
-    // Case 2: Track played for more than 3 seconds (timestamp fallback if trackEnd didn't fire)
+    // Case 3: Track played for more than 10 seconds (timestamp fallback)
     const elapsed = customData.trackStartedAt ? Date.now() - customData.trackStartedAt : 0;
-    if (elapsed > 3000) {
+    if (elapsed > 10000) {
       console.log(`[Lavalink] trackError suppressed — "${title}" played for ${Math.round(elapsed / 1000)}s`);
       customData.trackStartedAt = undefined;
       setCustomData(player, customData);
@@ -155,6 +168,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
     // Clear timestamps — this is a real failure (track never played)
     customData.trackStartedAt = undefined;
     customData.lastCleanEndId = undefined;
+    customData.queueEndedAt = undefined;
     setCustomData(player, customData);
 
     // YouTube track failed at start → try SoundCloud fallback
