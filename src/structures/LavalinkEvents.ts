@@ -1,4 +1,4 @@
-import { TextChannel, type Message } from "discord.js";
+import { TextChannel } from "discord.js";
 import type { Player, Track, UnresolvedTrack } from "lavalink-client";
 import type { MusicClient } from "./MusicClient.js";
 import { createPlayerEmbed } from "../ui/playerEmbed.js";
@@ -12,26 +12,23 @@ export function registerLavalinkEvents(client: MusicClient): void {
   lavalink.on("trackStart", async (player: Player, track: Track | null) => {
     if (!track || !player.textChannelId) return;
 
-    // Record when this track actually started playing
+    // Record start time and clear any stale "cleanly ended" marker
     const customData = getCustomData(player);
     customData.trackStartedAt = Date.now();
+    customData.lastCleanEndId = undefined;
     setCustomData(player, customData);
 
     try {
       const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
       if (!channel) return;
 
-      const customData = getCustomData(player);
-
-      // Clean up previous now-playing message if it exists
+      // Clean up previous now-playing message
       if (customData.lastMessageId) {
         try {
           const oldMsg = await channel.messages.fetch(customData.lastMessageId).catch(() => null);
-          if (oldMsg && oldMsg.deletable) {
-            await oldMsg.delete().catch(() => null);
-          }
+          if (oldMsg && oldMsg.deletable) await oldMsg.delete().catch(() => null);
         } catch {
-          // Ignore deletion error
+          // Ignore
         }
       }
 
@@ -44,9 +41,13 @@ export function registerLavalinkEvents(client: MusicClient): void {
     }
   });
 
-  // Track Ended
-  lavalink.on("trackEnd", async (player: Player, _track: Track | null) => {
-    // If not looping and queue has tracks, next will start automatically
+  // Track Ended — mark this track as cleanly ended so trackError can suppress false errors
+  lavalink.on("trackEnd", async (player: Player, track: Track | null) => {
+    if (!track) return;
+    const customData = getCustomData(player);
+    // Store the identifier of the track that just ended cleanly
+    customData.lastCleanEndId = track.info?.identifier ?? null;
+    setCustomData(player, customData);
   });
 
   // Queue Ended
@@ -61,7 +62,6 @@ export function registerLavalinkEvents(client: MusicClient): void {
         const query = `https://www.youtube.com/watch?v=${track.info.identifier}&list=RD${track.info.identifier}`;
         const res = await player.search({ query, source: "youtube" }, track.requester);
         if (res && res.tracks && res.tracks.length > 1) {
-          // Find next track not currently played
           const nextTrack = res.tracks.find((t) => t.info.identifier !== track.info.identifier) || res.tracks[1];
           if (nextTrack) {
             await player.queue.add(nextTrack);
@@ -82,7 +82,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
         });
       }
     } catch {
-      // Ignore channel send error
+      // Ignore
     }
 
     // Auto-disconnect if 24/7 mode is not enabled
@@ -96,9 +96,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
           if (recheckCustom.mode247 || recheckSettings.mode247) return;
 
           const ch = client.channels.cache.get(currentPlayer.textChannelId || "") as TextChannel | undefined;
-          if (ch) {
-            await ch.send("Leaving voice channel due to inactivity.").catch(() => null);
-          }
+          if (ch) await ch.send("Leaving voice channel due to inactivity.").catch(() => null);
           await currentPlayer.destroy("Queue empty timeout");
         }
       }, client.botConfig.player.autoDisconnectIdleSec * 1000);
@@ -111,7 +109,9 @@ export function registerLavalinkEvents(client: MusicClient): void {
     if (player.textChannelId) {
       const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
       if (channel) {
-        await channel.send(`Audio stream got stuck for **${track?.info.title || "Unknown"}**. Skipping to next...`).catch(() => null);
+        await channel
+          .send(`Audio stream got stuck for **${track?.info.title || "Unknown"}**. Skipping to next...`)
+          .catch(() => null);
       }
     }
     if (player.queue.tracks.length > 0) {
@@ -123,18 +123,26 @@ export function registerLavalinkEvents(client: MusicClient): void {
 
   // Track Error
   lavalink.on("trackError", async (player: Player, track: Track | UnresolvedTrack | null, payload) => {
-    console.error(`[Lavalink] Track error:`, payload);
-
-    // Suppress false errors: if the track already started playing more than 3 seconds ago,
-    // this is a mid-stream hiccup (e.g. YouTube stream closing after playback), not a true failure.
-    // player.position is reset to 0 before the event fires, so we use our own timestamp.
-    const customData = getCustomData(player);
-    const elapsed = customData.trackStartedAt ? Date.now() - customData.trackStartedAt : 0;
+    const title = (track as any)?.info?.title ?? "Unknown";
+    const identifier = (track as any)?.info?.identifier ?? null;
     const severity = payload?.exception?.severity ?? "";
+    console.error(`[Lavalink] Track error (severity: ${severity}) for "${title}":`, payload?.exception?.message ?? payload);
 
+    const customData = getCustomData(player);
+
+    // ── SUPPRESS FALSE ERRORS ──────────────────────────────────────────────
+    // Case 1: trackEnd already fired for this exact track (clean end + stale stream error from YouTube)
+    if (identifier && customData.lastCleanEndId === identifier) {
+      console.log(`[Lavalink] trackError suppressed — trackEnd already fired for "${title}" (${identifier})`);
+      customData.lastCleanEndId = undefined;
+      setCustomData(player, customData);
+      return;
+    }
+
+    // Case 2: Track played for more than 3 seconds (timestamp fallback if trackEnd didn't fire)
+    const elapsed = customData.trackStartedAt ? Date.now() - customData.trackStartedAt : 0;
     if (elapsed > 3000) {
-      console.log(`[Lavalink] trackError suppressed for "${(track as any)?.info?.title}" — played for ${Math.round(elapsed / 1000)}s (severity: ${severity})`);
-      // Clear the start timestamp
+      console.log(`[Lavalink] trackError suppressed — "${title}" played for ${Math.round(elapsed / 1000)}s`);
       customData.trackStartedAt = undefined;
       setCustomData(player, customData);
       if (player.queue.tracks.length === 0) {
@@ -142,12 +150,14 @@ export function registerLavalinkEvents(client: MusicClient): void {
       }
       return;
     }
+    // ──────────────────────────────────────────────────────────────────────
 
-    // Track never really played — reset timestamp
+    // Clear timestamps — this is a real failure (track never played)
     customData.trackStartedAt = undefined;
+    customData.lastCleanEndId = undefined;
     setCustomData(player, customData);
 
-    // If a YouTube track fails at the START (never played), try SoundCloud fallback.
+    // YouTube track failed at start → try SoundCloud fallback
     if (track && "info" in track && track.info.sourceName === "youtube") {
       try {
         const query = `${track.info.title} ${track.info.author || ""}`.trim();
@@ -158,7 +168,9 @@ export function registerLavalinkEvents(client: MusicClient): void {
           if (player.textChannelId) {
             const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
             if (channel) {
-              await channel.send(`YouTube playback restricted for **${track.info.title}**. Streaming via SoundCloud...`).catch(() => null);
+              await channel
+                .send(`YouTube playback restricted for **${track.info.title}**. Streaming via SoundCloud...`)
+                .catch(() => null);
             }
           }
           await player.play({ clientTrack: fallbackTrack });
@@ -169,11 +181,13 @@ export function registerLavalinkEvents(client: MusicClient): void {
       }
     }
 
-    // True failure — track never played, all fallbacks exhausted.
+    // True failure — all fallbacks exhausted
     if (player.textChannelId) {
       const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
       if (channel) {
-        await channel.send(`Failed to play track: **${(track as any)?.info?.title || "Unknown"}**.`).catch(() => null);
+        await channel
+          .send(`Failed to play track: **${title}**.`)
+          .catch(() => null);
       }
     }
     if (player.queue.tracks.length > 0) {
