@@ -171,19 +171,31 @@ export function registerLavalinkEvents(client: MusicClient): void {
     customData.queueEndedAt = undefined;
     setCustomData(player, customData);
 
-    // YouTube track failed at start → try SoundCloud fallback
+    // YouTube track failed at start → try alternative search (ytmsearch or scsearch)
     if (track && "info" in track && track.info.sourceName === "youtube") {
       try {
         const query = `${track.info.title} ${track.info.author || ""}`.trim();
-        const scRes = await player.search({ query, source: "scsearch" }, track.requester);
-        if (scRes && scRes.tracks && scRes.tracks.length > 0) {
-          const fallbackTrack = scRes.tracks[0];
-          console.log(`[Lavalink] Auto-fallback to SoundCloud for: "${track.info.title}"`);
+        // First try YouTube Music keyword search (different video ID / audio stream)
+        let fallbackRes = await player.search({ query, source: "ytmsearch" }, track.requester).catch(() => null);
+        
+        // Filter out the exact same failing identifier
+        let fallbackTrack = fallbackRes?.tracks?.find((t) => t.info?.identifier !== track.info?.identifier);
+
+        // If no alternative on YouTube Music, try SoundCloud
+        if (!fallbackTrack) {
+          const scRes = await player.search({ query, source: "scsearch" }, track.requester).catch(() => null);
+          if (scRes && scRes.tracks && scRes.tracks.length > 0) {
+            fallbackTrack = scRes.tracks[0];
+          }
+        }
+
+        if (fallbackTrack) {
+          console.log(`[Lavalink] Auto-fallback to "${fallbackTrack.info.sourceName}" for: "${track.info.title}"`);
           if (player.textChannelId) {
             const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
             if (channel) {
               await channel
-                .send(`YouTube playback restricted for **${track.info.title}**. Streaming via SoundCloud...`)
+                .send(`Direct stream failed for **${track.info.title}**. Streaming alternative via ${fallbackTrack.info.sourceName}...`)
                 .catch(() => null);
             }
           }
@@ -191,7 +203,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
           return;
         }
       } catch (fallbackErr) {
-        console.warn("[Lavalink] SoundCloud auto-fallback failed:", fallbackErr);
+        console.warn("[Lavalink] Auto-fallback failed:", fallbackErr);
       }
     }
 
