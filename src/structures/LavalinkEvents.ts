@@ -120,8 +120,22 @@ export function registerLavalinkEvents(client: MusicClient): void {
   lavalink.on("trackError", async (player: Player, track: Track | UnresolvedTrack | null, payload) => {
     console.error(`[Lavalink] Track error:`, payload);
 
-    // If a YouTube track fails (e.g. rate limit, signature cipher change, datacenter block),
-    // automatically fallback to SoundCloud so music playback is never interrupted.
+    // Suppress false errors: if the track already played for more than 3 seconds,
+    // the error is a mid-stream hiccup (e.g. YouTube rate limit at end of track),
+    // not a true playback failure. Don't send an error message to the user.
+    const trackPosition = (player as any).position ?? 0;
+    const severity = payload?.exception?.severity ?? "";
+
+    if (trackPosition > 3000) {
+      console.log(`[Lavalink] trackError suppressed for "${(track as any)?.info?.title}" — track already played ${Math.round(trackPosition / 1000)}s (severity: ${severity})`);
+      // If queue has more tracks, let lavalink-client advance naturally; otherwise stop cleanly.
+      if (player.queue.tracks.length === 0) {
+        await player.stopPlaying(true, false).catch(() => null);
+      }
+      return;
+    }
+
+    // If a YouTube track fails at the START (never played), try SoundCloud fallback.
     if (track && "info" in track && track.info.sourceName === "youtube") {
       try {
         const query = `${track.info.title} ${track.info.author || ""}`.trim();
@@ -132,7 +146,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
           if (player.textChannelId) {
             const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
             if (channel) {
-              await channel.send(`YouTube playback restricted for **${track.info.title}**. Streaming via SoundCloud fallback...`).catch(() => null);
+              await channel.send(`YouTube playback restricted for **${track.info.title}**. Streaming via SoundCloud...`).catch(() => null);
             }
           }
           await player.play({ clientTrack: fallbackTrack });
@@ -143,6 +157,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
       }
     }
 
+    // True failure — track never played, all fallbacks exhausted.
     if (player.textChannelId) {
       const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
       if (channel) {
