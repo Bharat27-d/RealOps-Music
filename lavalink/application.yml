@@ -48,7 +48,7 @@ lavalink:
     ratelimit:
       ipBlocks: ["2a01:4f8:c2c:ca2e::/64"]
       excludedIps: ["2a01:4f8:c2c:ca2e::1"]
-      strategy: "LoadBalancing"
+      strategy: "LoadBalance"
       searchTriggersFail: true
       retryLimit: -1
 
