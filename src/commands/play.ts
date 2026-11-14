@@ -14,6 +14,20 @@ import { isSpotifyUrl, resolveSpotifyUrl } from "../utils/spotifyResolver.js";
 import { getGuildSettings } from "../utils/guildSettings.js";
 
 /**
+ * Fetches video title via YouTube public oEmbed API when direct playback is blocked.
+ */
+async function fetchYoutubeOembedTitle(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+    if (res.ok) {
+      const data = (await res.json()) as any;
+      return data.title || null;
+    }
+  } catch {}
+  return null;
+}
+
+/**
  * Searches for a single track across YouTube Music, YouTube, and SoundCloud.
  * Filters out long compilation mixes (>15m) when normal song-length tracks exist.
  */
@@ -97,6 +111,14 @@ export const playCommand: Command = {
     }
 
     await interaction.deferReply();
+
+    const hasConnectedNode = [...client.lavalink.nodeManager.nodes.values()].some((n) => n.connected);
+    if (!hasConnectedNode) {
+      await interaction.editReply({
+        content: "Audio node is currently connecting to Lavalink. Please try again in a few seconds.",
+      });
+      return;
+    }
 
     const rawQuery = interaction.options.getString("query", true).trim();
     const sourceOption = interaction.options.getString("source");
@@ -287,6 +309,16 @@ export const playCommand: Command = {
       }
     }
 
+    // Strip tracking parameters from YouTube URLs
+    if (isUrl && (searchQuery.includes("youtube.com") || searchQuery.includes("youtu.be"))) {
+      try {
+        const parsed = new URL(searchQuery);
+        parsed.searchParams.delete("si");
+        parsed.searchParams.delete("feature");
+        searchQuery = parsed.toString();
+      } catch {}
+    }
+
     // ─────────────────────────────────────────────────────────────
     // 3. STANDARD SEARCH (Direct URL or Keyword Search)
     // ─────────────────────────────────────────────────────────────
@@ -296,18 +328,29 @@ export const playCommand: Command = {
         source: isUrl ? undefined : (defaultSource as SearchPlatform),
       },
       interaction.user
-    ).catch(() => null);
+    ).catch((err) => {
+      console.warn("[Play] Primary search failed:", err);
+      return null;
+    });
 
-    // Fallback: If YouTube search fails, try SoundCloud
+    // Fallback 1: If YouTube direct link fails (e.g. login required, region block), resolve title via oEmbed and search SoundCloud
+    if (isUrl && (!res || !res.tracks || res.tracks.length === 0)) {
+      if (rawQuery.includes("youtube.com") || rawQuery.includes("youtu.be")) {
+        console.log(`[Play] YouTube direct load failed. Resolving title via oEmbed for fallback...`);
+        const title = await fetchYoutubeOembedTitle(rawQuery);
+        if (title) {
+          console.log(`[Play] Resolved oEmbed title: "${title}". Searching SoundCloud...`);
+          res = await player.search({ query: title, source: "scsearch" }, interaction.user).catch(() => null);
+        }
+      }
+    }
+
+    // Fallback 2: If keyword search returned 0 tracks, try alternate source (SoundCloud <-> YouTube)
     if (!res || !res.tracks || res.tracks.length === 0) {
-      if (!isUrl && defaultSource !== "scsearch") {
-        res = await player.search(
-          {
-            query: searchQuery,
-            source: "scsearch",
-          },
-          interaction.user
-        ).catch(() => null);
+      if (!isUrl) {
+        const altSource = (defaultSource === "scsearch" ? "ytmsearch" : "scsearch") as SearchPlatform;
+        console.log(`[Play] Source "${defaultSource}" returned no tracks. Trying "${altSource}" for "${searchQuery}"`);
+        res = await player.search({ query: searchQuery, source: altSource }, interaction.user).catch(() => null);
       }
     }
 

@@ -41,6 +41,10 @@ export class MusicClient extends Client {
           port: config.lavalink.port,
           authorization: config.lavalink.password,
           secure: config.lavalink.secure,
+          heartBeatInterval: 0,
+          enablePingOnStatsCheck: false,
+          retryAmount: 100,
+          retryDelay: 3000,
         },
       ],
       sendToShard: (guildId: string, payload: unknown) => {
