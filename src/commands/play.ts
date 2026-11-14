@@ -333,24 +333,41 @@ export const playCommand: Command = {
       return null;
     });
 
-    // Fallback 1: If YouTube direct link fails (e.g. login required, region block), resolve title via oEmbed and search SoundCloud
+    // Fallback 1: If YouTube direct link fails (e.g. datacenter block, login required),
+    // resolve the title via oEmbed and re-search by keyword — keyword search uses a different
+    // YouTube code path and benefits from IPv6 rotation, avoiding direct video-ID blocks.
     if (isUrl && (!res || !res.tracks || res.tracks.length === 0)) {
       if (rawQuery.includes("youtube.com") || rawQuery.includes("youtu.be")) {
-        console.log(`[Play] YouTube direct load failed. Resolving title via oEmbed for fallback...`);
+        console.log(`[Play] YouTube direct load failed. Resolving title via oEmbed...`);
         const title = await fetchYoutubeOembedTitle(rawQuery);
         if (title) {
-          console.log(`[Play] Resolved oEmbed title: "${title}". Searching SoundCloud...`);
-          res = await player.search({ query: title, source: "scsearch" }, interaction.user).catch(() => null);
+          console.log(`[Play] oEmbed title: "${title}". Re-searching via ytmsearch → ytsearch → scsearch...`);
+          // Try ytmsearch first (keyword lookup goes through a different YouTube path)
+          res = await player.search({ query: title, source: "ytmsearch" }, interaction.user).catch(() => null);
+          // If ytmsearch also fails, try ytsearch
+          if (!res || !res.tracks || res.tracks.length === 0) {
+            res = await player.search({ query: title, source: "ytsearch" }, interaction.user).catch(() => null);
+          }
+          // Last resort: SoundCloud
+          if (!res || !res.tracks || res.tracks.length === 0) {
+            res = await player.search({ query: title, source: "scsearch" }, interaction.user).catch(() => null);
+          }
         }
       }
     }
 
-    // Fallback 2: If keyword search returned 0 tracks, try alternate source (SoundCloud <-> YouTube)
+    // Fallback 2: If keyword search returned 0 tracks, try other sources
     if (!res || !res.tracks || res.tracks.length === 0) {
       if (!isUrl) {
-        const altSource = (defaultSource === "scsearch" ? "ytmsearch" : "scsearch") as SearchPlatform;
-        console.log(`[Play] Source "${defaultSource}" returned no tracks. Trying "${altSource}" for "${searchQuery}"`);
-        res = await player.search({ query: searchQuery, source: altSource }, interaction.user).catch(() => null);
+        // Try the sources we haven't tried yet, in order of reliability
+        const fallbackSources = ["ytmsearch", "ytsearch", "scsearch"].filter(
+          (s) => s !== defaultSource
+        ) as SearchPlatform[];
+        for (const src of fallbackSources) {
+          console.log(`[Play] Trying fallback source "${src}" for "${searchQuery}"`);
+          res = await player.search({ query: searchQuery, source: src }, interaction.user).catch(() => null);
+          if (res && res.tracks && res.tracks.length > 0) break;
+        }
       }
     }
 
