@@ -9,26 +9,26 @@ export const helpCommand: Command = {
 
   async execute(interaction: ChatInputCommandInteraction, _client: MusicClient) {
     const embed = new EmbedBuilder()
-      .setColor(0x5865f2)
-      .setTitle("🎵 RealOps Music — Command Center")
-      .setDescription("Enterprise-grade Discord music bot with high-fidelity audio and cross-platform streaming.")
+      .setColor(0x2b2d31)
+      .setTitle("RealOps Music — Commands")
+      .setDescription("High-fidelity audio streaming and music controls for Discord.")
       .addFields(
         {
-          name: "🎶 Playback Commands",
+          name: "Playback",
           value:
-            "`/play <query>` - Play song, playlist, or stream (Spotify, YT, SoundCloud, Apple Music)\n" +
+            "`/play <query>` - Play song, playlist, or stream\n" +
             "`/pause` - Pause playback\n" +
             "`/resume` - Resume playback\n" +
-            "`/skip [to]` - Skip current or jump to track\n" +
+            "`/skip [to]` - Skip current track or jump to index\n" +
             "`/previous` - Play previously played song\n" +
-            "`/stop` - Stop music, clear queue, and leave VC\n" +
-            "`/seek <time>` - Seek to a timestamp (e.g. `1:30`)\n" +
+            "`/stop` - Stop music, clear queue, and leave voice channel\n" +
+            "`/seek <time>` - Seek to timestamp (e.g. `1:30`)\n" +
             "`/volume <1-200>` - Change playback volume",
         },
         {
-          name: "📑 Queue & Playlist",
+          name: "Queue & Playlist",
           value:
-            "`/nowplaying` - View interactive controller embed with buttons\n" +
+            "`/nowplaying` - View interactive controller\n" +
             "`/queue [page]` - Paginated server queue\n" +
             "`/shuffle` - Randomize queue order\n" +
             "`/loop <mode>` - Off, Single Track, or Whole Queue\n" +
@@ -38,22 +38,21 @@ export const helpCommand: Command = {
             "`/jump <pos>` - Jump directly to a track",
         },
         {
-          name: "🎧 Audio DSP & Effects",
+          name: "Audio DSP & Effects",
           value:
             "`/filter <preset>` - Bass Boost, Nightcore, Vaporwave, 8D Audio, Tremolo, Karaoke, Clear",
         },
         {
-          name: "⚙️ Smart Features",
+          name: "Smart Features",
           value:
-            "`/autoplay` - Toggle automatic song recommendations when queue ends\n" +
-            "`/247` - Toggle 24/7 staying in voice channel\n" +
+            "`/autoplay` - Toggle automatic song recommendations\n" +
+            "`/247` - Toggle 24/7 mode\n" +
             "`/lyrics [song]` - View synchronized or plain lyrics",
         }
       )
-      .setFooter({ text: "RealOps Music • Powered by Lavalink v4" })
+      .setFooter({ text: "RealOps Music" })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
   },
 };
-

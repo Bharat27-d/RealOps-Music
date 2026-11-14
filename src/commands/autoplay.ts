@@ -12,13 +12,13 @@ export const autoplayCommand: Command = {
     const player = client.lavalink.getPlayer(interaction.guildId!);
 
     if (!player) {
-      await interaction.reply({ content: "❌ No active session found.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: "No active session found.", flags: MessageFlags.Ephemeral });
       return;
     }
 
     if (member.voice.channelId !== player.voiceChannelId) {
       await interaction.reply({
-        content: "❌ You must be in the same voice channel as the bot.",
+        content: "You must be in the same voice channel as the bot.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -29,7 +29,7 @@ export const autoplayCommand: Command = {
     setCustomData(player, customData);
 
     await interaction.reply(
-      `📻 Autoplay is now **${customData.autoplay ? "ENABLED" : "DISABLED"}**. Similar songs will ${
+      `Autoplay is now **${customData.autoplay ? "ENABLED" : "DISABLED"}**. Similar songs will ${
         customData.autoplay ? "automatically play" : "not be queued"
       } when the queue finishes.`
     );

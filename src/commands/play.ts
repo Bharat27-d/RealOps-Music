@@ -8,8 +8,10 @@ import {
 import type { Player, Track, UnresolvedTrack, SearchPlatform } from "lavalink-client";
 import type { MusicClient } from "../structures/MusicClient.js";
 import type { Command } from "../types/index.js";
+import { getCustomData, setCustomData } from "../types/index.js";
 import { formatDuration, truncate } from "../utils/formatters.js";
 import { isSpotifyUrl, resolveSpotifyUrl } from "../utils/spotifyResolver.js";
+import { getGuildSettings } from "../utils/guildSettings.js";
 
 /**
  * Searches for a single track across YouTube Music, YouTube, and SoundCloud.
@@ -79,7 +81,7 @@ export const playCommand: Command = {
 
     if (!voiceChannel) {
       await interaction.reply({
-        content: "❌ You need to be in a voice channel to play music!",
+        content: "You need to be in a voice channel to play music.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -88,7 +90,7 @@ export const playCommand: Command = {
     const permissions = voiceChannel.permissionsFor(interaction.client.user);
     if (!permissions?.has("Connect") || !permissions?.has("Speak")) {
       await interaction.reply({
-        content: "❌ I don't have permission to connect and speak in your voice channel!",
+        content: "I do not have permission to connect and speak in your voice channel.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -111,6 +113,13 @@ export const playCommand: Command = {
         volume: client.botConfig.player.defaultVolume,
         instaUpdateFiltersFix: true,
       });
+
+      const settings = getGuildSettings(interaction.guildId!);
+      if (settings.mode247) {
+        const customData = getCustomData(player);
+        customData.mode247 = true;
+        setCustomData(player, customData);
+      }
     }
 
     // Connect if not already in voice
@@ -138,7 +147,7 @@ export const playCommand: Command = {
 
           if (!firstTrack) {
             await interaction.editReply({
-              content: `❌ Could not resolve tracks from Spotify ${spotifyData.type}: \`${truncate(spotifyData.title, 50)}\`.`,
+              content: `Could not resolve tracks from Spotify ${spotifyData.type}: \`${truncate(spotifyData.title, 50)}\`.`,
             });
             return;
           }
@@ -151,19 +160,19 @@ export const playCommand: Command = {
           if (totalTracks === 1) {
             // Only 1 song in playlist
             await interaction.editReply({
-              content: `🎶 Queued **${truncate(firstTrack.info.title, 50)}** from Spotify!`,
+              content: `Queued **${truncate(firstTrack.info.title, 50)}** from Spotify.`,
             });
             return;
           }
 
           // Initial confirmation embed to Discord
           const loadingEmbed = new EmbedBuilder()
-            .setColor(0x5865f2)
-            .setTitle(`📑 Loading Spotify ${spotifyData.type === "album" ? "Album" : "Playlist"}`)
+            .setColor(0x2b2d31)
+            .setTitle(`Loading Spotify ${spotifyData.type === "album" ? "Album" : "Playlist"}`)
             .setDescription(
               `Found **${totalTracks} tracks** in **[${truncate(spotifyData.title, 50)}](${rawQuery})**\n\n` +
-              `🎶 **Playing first:** [${truncate(firstTrack.info.title, 45)}](${firstTrack.info.uri})\n` +
-              `⏳ Queuing remaining **${totalTracks - 1} tracks** in background...`
+              `Playing first: [${truncate(firstTrack.info.title, 45)}](${firstTrack.info.uri})\n` +
+              `Queuing remaining **${totalTracks - 1} tracks** in background...`
             )
             .setFooter({ text: `Requested by ${interaction.user.username}` })
             .setTimestamp();
@@ -195,11 +204,11 @@ export const playCommand: Command = {
             }
 
             const doneEmbed = new EmbedBuilder()
-              .setColor(0x57f287)
-              .setTitle(`✅ Spotify ${spotifyData.type === "album" ? "Album" : "Playlist"} Added`)
+              .setColor(0x2b2d31)
+              .setTitle(`Spotify ${spotifyData.type === "album" ? "Album" : "Playlist"} Added`)
               .setDescription(
-                `Successfully loaded **${loadedCount} tracks** from **[${truncate(spotifyData.title, 50)}](${rawQuery})** to the queue!\n\n` +
-                `💡 Use \`/queue\` to see all tracks or \`/shuffle\` to randomize.`
+                `Successfully loaded **${loadedCount} tracks** from **[${truncate(spotifyData.title, 50)}](${rawQuery})** to the queue.\n\n` +
+                `Use \`/queue\` to see all tracks or \`/shuffle\` to randomize.`
               )
               .setFooter({ text: `Requested by ${interaction.user.username}` })
               .setTimestamp();
@@ -214,7 +223,7 @@ export const playCommand: Command = {
         const singleTrack = await searchBestTrack(player, spotifyData.searchQuery, interaction.user);
         if (!singleTrack) {
           await interaction.editReply({
-            content: `❌ Could not find track \`${truncate(spotifyData.title, 50)}\` on YouTube/SoundCloud.`,
+            content: `Could not find track \`${truncate(spotifyData.title, 50)}\` on YouTube/SoundCloud.`,
           });
           return;
         }
@@ -222,12 +231,12 @@ export const playCommand: Command = {
         await player.queue.add(singleTrack);
         if (!player.playing) {
           await player.play();
-          await interaction.editReply({ content: `🎶 Now playing **${truncate(singleTrack.info.title, 50)}**!` });
+          await interaction.editReply({ content: `Now playing **${truncate(singleTrack.info.title, 50)}**.` });
         } else {
           const embed = new EmbedBuilder()
-            .setColor(0x5865f2)
-            .setTitle("🎵 Added to Queue")
-            .setDescription(`[${truncate(singleTrack.info.title, 55)}](${singleTrack.info.uri})\nBy \`${truncate(singleTrack.info.author, 40)}\``)
+            .setColor(0x2b2d31)
+            .setTitle("Added to Queue")
+            .setDescription(`[${truncate(singleTrack.info.title, 55)}](${singleTrack.info.uri})\nBy **${truncate(singleTrack.info.author, 40)}**`)
             .addFields(
               { name: "Duration", value: `\`${formatDuration(singleTrack.info.duration)}\``, inline: true },
               { name: "Position in Queue", value: `\`#${player.queue.tracks.length}\``, inline: true }
@@ -260,11 +269,11 @@ export const playCommand: Command = {
           if (!player.playing) await player.play();
 
           const playlistName = plRes.playlist?.name || "YouTube Playlist";
-          const totalDuration = plRes.tracks.reduce((acc, t) => acc + (t.info.duration || 0), 0);
+          const totalDuration = plRes.tracks.reduce((acc, t) => acc + (t.info?.duration || 0), 0);
 
           const embed = new EmbedBuilder()
-            .setColor(0x5865f2)
-            .setTitle("📑 Added Playlist to Queue")
+            .setColor(0x2b2d31)
+            .setTitle("Added Playlist to Queue")
             .setDescription(
               `Added **${plRes.tracks.length} tracks** from **[${truncate(playlistName, 50)}](${rawQuery})**\n` +
               `Total Duration: \`${formatDuration(totalDuration)}\``
@@ -304,7 +313,7 @@ export const playCommand: Command = {
 
     if (!res || !res.tracks || res.tracks.length === 0) {
       await interaction.editReply({
-        content: `❌ No results found for \`${truncate(rawQuery, 50)}\`.`,
+        content: `No results found for \`${truncate(rawQuery, 50)}\`.`,
       });
       return;
     }
@@ -318,8 +327,8 @@ export const playCommand: Command = {
       const totalDuration = res.tracks.reduce((acc, t) => acc + (t.info?.duration || 0), 0);
 
       const embed = new EmbedBuilder()
-        .setColor(0x5865f2)
-        .setTitle("📑 Added Playlist to Queue")
+        .setColor(0x2b2d31)
+        .setTitle("Added Playlist to Queue")
         .setDescription(
           `Added **${res.tracks.length} tracks** from **[${truncate(playlistName, 50)}](${rawQuery})**\n` +
           `Total Duration: \`${formatDuration(totalDuration)}\``
@@ -344,9 +353,9 @@ export const playCommand: Command = {
 
     if (player.playing) {
       const embed = new EmbedBuilder()
-        .setColor(0x5865f2)
-        .setTitle("🎵 Added to Queue")
-        .setDescription(`[${truncate(track.info.title, 55)}](${track.info.uri})\nBy \`${truncate(track.info.author, 40)}\``)
+        .setColor(0x2b2d31)
+        .setTitle("Added to Queue")
+        .setDescription(`[${truncate(track.info.title, 55)}](${track.info.uri})\nBy **${truncate(track.info.author, 40)}**`)
         .addFields(
           { name: "Duration", value: `\`${formatDuration(track.info.duration)}\``, inline: true },
           { name: "Position in Queue", value: `\`#${player.queue.tracks.length}\``, inline: true }
@@ -356,7 +365,7 @@ export const playCommand: Command = {
 
       await interaction.editReply({ embeds: [embed] });
     } else {
-      await interaction.editReply({ content: `🎶 Now playing **${truncate(track.info.title, 50)}**!` });
+      await interaction.editReply({ content: `Now playing **${truncate(track.info.title, 50)}**.` });
       await player.play();
     }
   },

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, type ChatInputCommandInteraction, type GuildMember , MessageFlags } from "discord.js";
+import { SlashCommandBuilder, type ChatInputCommandInteraction, type GuildMember, MessageFlags } from "discord.js";
 import type { MusicClient } from "../structures/MusicClient.js";
 import type { Command } from "../types/index.js";
 
@@ -12,25 +12,24 @@ export const resumeCommand: Command = {
     const player = client.lavalink.getPlayer(interaction.guildId!);
 
     if (!player || !player.queue.current) {
-      await interaction.reply({ content: "❌ Nothing is currently playing.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: "Nothing is currently playing.", flags: MessageFlags.Ephemeral });
       return;
     }
 
     if (member.voice.channelId !== player.voiceChannelId) {
       await interaction.reply({
-        content: "❌ You must be in the same voice channel as the bot.",
+        content: "You must be in the same voice channel as the bot.",
         flags: MessageFlags.Ephemeral,
       });
       return;
     }
 
     if (!player.paused) {
-      await interaction.reply({ content: "⚠️ The player is not paused.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: "The player is not paused.", flags: MessageFlags.Ephemeral });
       return;
     }
 
     await player.resume();
-    await interaction.reply("▶️ Playback has been resumed.");
+    await interaction.reply("Playback has been resumed.");
   },
 };
-

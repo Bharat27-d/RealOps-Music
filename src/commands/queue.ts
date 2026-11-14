@@ -24,7 +24,7 @@ export const queueCommand: Command = {
     const player = client.lavalink.getPlayer(interaction.guildId!);
 
     if (!player || (!player.queue.current && player.queue.tracks.length === 0)) {
-      await interaction.reply({ content: "📑 The queue is currently empty.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: "The queue is currently empty.", flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -39,7 +39,7 @@ export const queueCommand: Command = {
 
       const current = player.queue.current;
       const currentText = current
-        ? `▶️ **Now Playing:** [${truncate(current.info.title, 45)}](${current.info.uri}) — \`${formatDuration(
+        ? `**Now Playing:** [${truncate(current.info.title, 45)}](${current.info.uri}) — \`${formatDuration(
             current.info.duration
           )}\`\n\n`
         : "";
@@ -55,11 +55,11 @@ export const queueCommand: Command = {
             .join("\n")
         : "*No more tracks in queue.*";
 
-      const totalDuration = tracks.reduce((acc, t) => acc + (t.info.duration || 0), 0);
+      const totalDuration = tracks.reduce((acc, t) => acc + (t.info?.duration || 0), 0);
 
       return new EmbedBuilder()
-        .setColor(0x5865f2)
-        .setTitle(`🎶 Server Music Queue (${tracks.length} tracks)`)
+        .setColor(0x2b2d31)
+        .setTitle(`Server Queue (${tracks.length} tracks)`)
         .setDescription(`${currentText}**Up Next:**\n${queueList}`)
         .addFields({
           name: "Total Queue Time",
@@ -74,13 +74,11 @@ export const queueCommand: Command = {
       return new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
           .setCustomId("queue_prev")
-          .setEmoji("⬅️")
           .setLabel("Previous")
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(page <= 1),
         new ButtonBuilder()
           .setCustomId("queue_next")
-          .setEmoji("➡️")
           .setLabel("Next")
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(page >= totalPages)
@@ -102,7 +100,7 @@ export const queueCommand: Command = {
       collector.on("collect", async (btnInteraction) => {
         if (btnInteraction.user.id !== interaction.user.id) {
           await btnInteraction.reply({
-            content: "❌ Only the person who used /queue can navigate pages.",
+            content: "Only the person who used /queue can navigate pages.",
             flags: MessageFlags.Ephemeral,
           });
           return;
@@ -126,4 +124,3 @@ export const queueCommand: Command = {
     }
   },
 };
-

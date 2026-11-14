@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, type ChatInputCommandInteraction, type GuildMember , MessageFlags } from "discord.js";
+import { SlashCommandBuilder, type ChatInputCommandInteraction, type GuildMember, MessageFlags } from "discord.js";
 import type { MusicClient } from "../structures/MusicClient.js";
 import type { Command } from "../types/index.js";
 
@@ -27,13 +27,13 @@ export const filterCommand: Command = {
     const player = client.lavalink.getPlayer(interaction.guildId!);
 
     if (!player) {
-      await interaction.reply({ content: "❌ No active session found.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: "No active session found.", flags: MessageFlags.Ephemeral });
       return;
     }
 
     if (member.voice.channelId !== player.voiceChannelId) {
       await interaction.reply({
-        content: "❌ You must be in the same voice channel as the bot.",
+        content: "You must be in the same voice channel as the bot.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -46,47 +46,46 @@ export const filterCommand: Command = {
       switch (preset) {
         case "clear":
           await player.filterManager.resetFilters();
-          await interaction.editReply("✨ All audio filters have been **cleared**.");
+          await interaction.editReply("All audio filters have been **cleared**.");
           break;
 
         case "bassboost":
           await player.filterManager.setEQPreset("BassboostHigh");
-          await interaction.editReply("🔊 **Bass Boost (High)** has been enabled.");
+          await interaction.editReply("**Bass Boost (High)** has been enabled.");
           break;
 
         case "nightcore":
           await player.filterManager.toggleNightcore();
-          await interaction.editReply("🌙 **Nightcore** mode toggled.");
+          await interaction.editReply("**Nightcore** mode toggled.");
           break;
 
         case "vaporwave":
           await player.filterManager.toggleVaporwave();
-          await interaction.editReply("🌊 **Vaporwave** mode toggled.");
+          await interaction.editReply("**Vaporwave** mode toggled.");
           break;
 
         case "8d":
-          await player.filterManager.toggleRotation(0.2);
-          await interaction.editReply("🎧 **8D Audio** rotating effect toggled.");
+          await player.filterManager.toggleRotation();
+          await interaction.editReply("**8D Audio (Surround Rotation)** mode toggled.");
           break;
 
         case "tremolo":
-          await player.filterManager.toggleTremolo(4.0, 0.75);
-          await interaction.editReply("〰️ **Tremolo** effect toggled.");
+          await player.filterManager.toggleTremolo();
+          await interaction.editReply("**Tremolo** mode toggled.");
           break;
 
         case "karaoke":
-          await player.filterManager.toggleKaraoke(1.0, 1.0, 220.0, 100.0);
-          await interaction.editReply("🎤 **Karaoke (Vocal Suppression)** effect toggled.");
+          await player.filterManager.toggleKaraoke();
+          await interaction.editReply("**Karaoke (Vocal Suppression)** mode toggled.");
           break;
 
         default:
-          await interaction.editReply("❌ Unknown filter preset.");
+          await interaction.editReply("Unknown filter preset.");
           break;
       }
-    } catch (error) {
-      console.error("[Filter] Failed to apply filter:", error);
-      await interaction.editReply("❌ Failed to apply the selected audio filter.");
+    } catch (err) {
+      console.error("[FilterCommand] Error:", err);
+      await interaction.editReply("An error occurred while setting filters.");
     }
   },
 };
-

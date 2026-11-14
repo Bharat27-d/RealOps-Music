@@ -21,5 +21,8 @@ lavalink/application.yml
 lavalink/plugins/
 lavalink/*.jar
 
+# Data storage
+data/
+
 # System files
 .DS_Store

@@ -22,7 +22,7 @@ export async function handleButtonInteraction(
   // If player doesn't exist, remove components or inform user
   if (!player) {
     await interaction.reply({
-      content: "❌ There is no active music session in this server.",
+      content: "There is no active music session in this server.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -34,7 +34,7 @@ export async function handleButtonInteraction(
 
   if (!memberVc || memberVc !== botVc) {
     await interaction.reply({
-      content: "❌ You must be in the same voice channel as the bot to use player controls.",
+      content: "You must be in the same voice channel as the bot to use player controls.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -45,10 +45,10 @@ export async function handleButtonInteraction(
       case "btn_playpause": {
         if (player.paused) {
           await player.resume();
-          await interaction.reply({ content: "▶️ Resumed playback.", flags: MessageFlags.Ephemeral });
+          await interaction.reply({ content: "Resumed playback.", flags: MessageFlags.Ephemeral });
         } else {
           await player.pause();
-          await interaction.reply({ content: "⏸️ Paused playback.", flags: MessageFlags.Ephemeral });
+          await interaction.reply({ content: "Paused playback.", flags: MessageFlags.Ephemeral });
         }
         // Update now playing embed
         const payload = createPlayerEmbed(player);
@@ -61,13 +61,13 @@ export async function handleButtonInteraction(
         if (player.queue.tracks.length > 0) {
           await player.skip(0, false);
           await interaction.reply({
-            content: `⏭️ Skipped **${truncate(currentTitle, 40)}**.`,
+            content: `Skipped **${truncate(currentTitle, 40)}**.`,
             flags: MessageFlags.Ephemeral,
           });
         } else {
           await player.stopPlaying(true, false);
           await interaction.reply({
-            content: `⏭️ Skipped **${truncate(currentTitle, 40)}**. (Queue is now empty)`,
+            content: `Skipped **${truncate(currentTitle, 40)}**. Queue is now empty.`,
             flags: MessageFlags.Ephemeral,
           });
         }
@@ -77,7 +77,7 @@ export async function handleButtonInteraction(
       case "btn_previous": {
         if (player.queue.previous.length === 0) {
           await interaction.reply({
-            content: "⚠️ No previous track available in history.",
+            content: "No previous track available in history.",
             flags: MessageFlags.Ephemeral,
           });
           return;
@@ -88,7 +88,7 @@ export async function handleButtonInteraction(
           await player.queue.add(prev, 0);
           await player.skip(0, false);
           await interaction.reply({
-            content: `⏮️ Playing previous track: **${truncate(prev.info.title, 40)}**.`,
+            content: `Playing previous track: **${truncate(prev.info.title, 40)}**.`,
             flags: MessageFlags.Ephemeral,
           });
         }
@@ -98,7 +98,7 @@ export async function handleButtonInteraction(
       case "btn_stop": {
         player.queue.tracks.splice(0, player.queue.tracks.length);
         await player.stopPlaying(true, false);
-        await interaction.reply({ content: "⏹️ Playback stopped and queue cleared." });
+        await interaction.reply({ content: "Playback stopped and queue cleared." });
         break;
       }
 
@@ -112,12 +112,12 @@ export async function handleButtonInteraction(
 
         const modeLabels = {
           off: "Disabled",
-          track: "🔂 Single Track",
-          queue: "🔁 Whole Queue",
+          track: "Single Track",
+          queue: "Whole Queue",
         };
 
         await interaction.reply({
-          content: `🔁 Loop mode set to: **${modeLabels[nextMode]}**.`,
+          content: `Loop mode set to: **${modeLabels[nextMode]}**.`,
           flags: MessageFlags.Ephemeral,
         });
 
@@ -129,7 +129,7 @@ export async function handleButtonInteraction(
       case "btn_shuffle": {
         if (player.queue.tracks.length <= 1) {
           await interaction.reply({
-            content: "⚠️ Not enough tracks in queue to shuffle.",
+            content: "Not enough tracks in queue to shuffle.",
             flags: MessageFlags.Ephemeral,
           });
           return;
@@ -137,7 +137,7 @@ export async function handleButtonInteraction(
 
         await player.queue.shuffle();
         await interaction.reply({
-          content: `🔀 Shuffled **${player.queue.tracks.length}** songs in queue!`,
+          content: `Shuffled **${player.queue.tracks.length}** songs in queue.`,
           flags: MessageFlags.Ephemeral,
         });
         break;
@@ -148,7 +148,7 @@ export async function handleButtonInteraction(
         const newVol = Math.max(10, currentVol - 10);
         await player.setVolume(newVol);
         await interaction.reply({
-          content: `🔉 Volume lowered to **${newVol}%**.`,
+          content: `Volume set to **${newVol}%**.`,
           flags: MessageFlags.Ephemeral,
         });
 
@@ -162,7 +162,7 @@ export async function handleButtonInteraction(
         const newVol = Math.min(200, currentVol + 10);
         await player.setVolume(newVol);
         await interaction.reply({
-          content: `🔊 Volume raised to **${newVol}%**.`,
+          content: `Volume set to **${newVol}%**.`,
           flags: MessageFlags.Ephemeral,
         });
 
@@ -174,7 +174,7 @@ export async function handleButtonInteraction(
       case "btn_lyrics": {
         const current = player.queue.current;
         if (!current) {
-          await interaction.reply({ content: "⚠️ No track is playing.", flags: MessageFlags.Ephemeral });
+          await interaction.reply({ content: "No track is currently playing.", flags: MessageFlags.Ephemeral });
           return;
         }
 
@@ -187,7 +187,7 @@ export async function handleButtonInteraction(
 
         if (!lyrics || (!lyrics.plainLyrics && !lyrics.syncedLyrics)) {
           await interaction.editReply({
-            content: `❌ No lyrics found for **${truncate(current.info.title, 40)}**.`,
+            content: `No lyrics found for **${truncate(current.info.title, 40)}**.`,
           });
           return;
         }
@@ -196,8 +196,8 @@ export async function handleButtonInteraction(
         const lines = rawText.slice(0, 3900);
 
         const lyricsEmbed = new EmbedBuilder()
-          .setColor(0x5865f2)
-          .setTitle(`📜 Lyrics: ${truncate(lyrics.title, 40)} - ${truncate(lyrics.artist, 30)}`)
+          .setColor(0x2b2d31)
+          .setTitle(`Lyrics: ${truncate(lyrics.title, 40)} - ${truncate(lyrics.artist, 30)}`)
           .setDescription(lines)
           .setFooter({ text: "Lyrics powered by LRCLIB" })
           .setTimestamp();
@@ -210,7 +210,7 @@ export async function handleButtonInteraction(
         const tracks = player.queue.tracks;
         if (tracks.length === 0) {
           await interaction.reply({
-            content: "📑 The queue is currently empty (only current song playing).",
+            content: "The queue is currently empty.",
             flags: MessageFlags.Ephemeral,
           });
           return;
@@ -227,8 +227,8 @@ export async function handleButtonInteraction(
           .join("\n");
 
         const qEmbed = new EmbedBuilder()
-          .setColor(0x5865f2)
-          .setTitle(`📑 Server Queue (${tracks.length} tracks)`)
+          .setColor(0x2b2d31)
+          .setTitle(`Server Queue (${tracks.length} tracks)`)
           .setDescription(description)
           .setFooter({
             text: tracks.length > 10 ? `Showing first 10 of ${tracks.length} tracks` : "End of queue",
@@ -245,7 +245,7 @@ export async function handleButtonInteraction(
     console.error(`[ButtonHandler] Error handling button ${customId}:`, error);
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({
-        content: "⚠️ An error occurred while processing this action.",
+        content: "An error occurred while processing this action.",
         flags: MessageFlags.Ephemeral,
       });
     }

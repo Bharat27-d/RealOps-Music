@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, type ChatInputCommandInteraction, type GuildMember , MessageFlags } from "discord.js";
+import { SlashCommandBuilder, type ChatInputCommandInteraction, type GuildMember, MessageFlags } from "discord.js";
 import type { MusicClient } from "../structures/MusicClient.js";
 import type { Command } from "../types/index.js";
 
@@ -20,13 +20,13 @@ export const volumeCommand: Command = {
     const player = client.lavalink.getPlayer(interaction.guildId!);
 
     if (!player) {
-      await interaction.reply({ content: "❌ No active player found.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: "No active player found.", flags: MessageFlags.Ephemeral });
       return;
     }
 
     if (member.voice.channelId !== player.voiceChannelId) {
       await interaction.reply({
-        content: "❌ You must be in the same voice channel as the bot.",
+        content: "You must be in the same voice channel as the bot.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -35,11 +35,6 @@ export const volumeCommand: Command = {
     const volume = interaction.options.getInteger("percent", true);
     await player.setVolume(volume);
 
-    let emoji = "🔉";
-    if (volume > 100) emoji = "🔊";
-    else if (volume < 30) emoji = "🔈";
-
-    await interaction.reply(`${emoji} Volume set to **${volume}%**.`);
+    await interaction.reply(`Volume set to **${volume}%**.`);
   },
 };
-

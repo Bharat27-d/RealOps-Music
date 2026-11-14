@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, type ChatInputCommandInteraction , MessageFlags } from "discord.js";
+import { SlashCommandBuilder, type ChatInputCommandInteraction, MessageFlags } from "discord.js";
 import type { MusicClient } from "../structures/MusicClient.js";
 import type { Command } from "../types/index.js";
 import { createPlayerEmbed } from "../ui/playerEmbed.js";
@@ -12,7 +12,7 @@ export const nowPlayingCommand: Command = {
     const player = client.lavalink.getPlayer(interaction.guildId!);
 
     if (!player || !player.queue.current) {
-      await interaction.reply({ content: "❌ Nothing is currently playing.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: "Nothing is currently playing.", flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -20,4 +20,3 @@ export const nowPlayingCommand: Command = {
     await interaction.reply(payload);
   },
 };
-

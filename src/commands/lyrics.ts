@@ -25,7 +25,7 @@ export const lyricsCommand: Command = {
     if (!titleToSearch) {
       if (!player || !player.queue.current) {
         await interaction.editReply({
-          content: "❌ Nothing is currently playing. Provide a song name: `/lyrics song:Bohemian Rhapsody`.",
+          content: "Nothing is currently playing. Provide a song name: `/lyrics song:Bohemian Rhapsody`.",
         });
         return;
       }
@@ -38,7 +38,7 @@ export const lyricsCommand: Command = {
 
     if (!lyrics || (!lyrics.plainLyrics && !lyrics.syncedLyrics)) {
       await interaction.editReply({
-        content: `❌ No lyrics found for **${truncate(titleToSearch, 50)}**.`,
+        content: `No lyrics found for **${truncate(titleToSearch, 50)}**.`,
       });
       return;
     }
@@ -48,8 +48,8 @@ export const lyricsCommand: Command = {
     const displayText = text.length > 4000 ? `${text.slice(0, 3950)}...\n*(Lyrics truncated)*` : text;
 
     const embed = new EmbedBuilder()
-      .setColor(0x5865f2)
-      .setTitle(`📜 ${truncate(lyrics.title, 50)}`)
+      .setColor(0x2b2d31)
+      .setTitle(`Lyrics: ${truncate(lyrics.title, 50)}`)
       .setAuthor({ name: truncate(lyrics.artist, 40) })
       .setDescription(displayText)
       .setFooter({ text: "Lyrics retrieved via LRCLIB" })
@@ -58,4 +58,3 @@ export const lyricsCommand: Command = {
     await interaction.editReply({ embeds: [embed] });
   },
 };
-

@@ -3,6 +3,7 @@ import type { Player, Track, UnresolvedTrack } from "lavalink-client";
 import type { MusicClient } from "./MusicClient.js";
 import { createPlayerEmbed } from "../ui/playerEmbed.js";
 import { getCustomData, setCustomData } from "../types/index.js";
+import { getGuildSettings } from "../utils/guildSettings.js";
 
 export function registerLavalinkEvents(client: MusicClient): void {
   const lavalink = client.lavalink;
@@ -72,7 +73,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
       const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
       if (channel) {
         await channel.send({
-          content: "🏁 **Queue has ended!** Add more tracks with `/play` or enable `/autoplay`.",
+          content: "Queue has ended. Add more tracks with `/play` or enable `/autoplay`.",
         });
       }
     } catch {
@@ -80,13 +81,18 @@ export function registerLavalinkEvents(client: MusicClient): void {
     }
 
     // Auto-disconnect if 24/7 mode is not enabled
-    if (!customData.mode247) {
+    const guildSettings = getGuildSettings(player.guildId);
+    if (!customData.mode247 && !guildSettings.mode247) {
       setTimeout(async () => {
         const currentPlayer = client.lavalink.getPlayer(player.guildId);
         if (currentPlayer && currentPlayer.queue.tracks.length === 0 && !currentPlayer.playing) {
+          const recheckCustom = getCustomData(currentPlayer);
+          const recheckSettings = getGuildSettings(player.guildId);
+          if (recheckCustom.mode247 || recheckSettings.mode247) return;
+
           const ch = client.channels.cache.get(currentPlayer.textChannelId || "") as TextChannel | undefined;
           if (ch) {
-            await ch.send("👋 Leaving voice channel due to inactivity.").catch(() => null);
+            await ch.send("Leaving voice channel due to inactivity.").catch(() => null);
           }
           await currentPlayer.destroy("Queue empty timeout");
         }
@@ -100,7 +106,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
     if (player.textChannelId) {
       const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
       if (channel) {
-        await channel.send(`⚠️ Audio stream got stuck for **${track?.info.title || "Unknown"}**. Skipping to next...`).catch(() => null);
+        await channel.send(`Audio stream got stuck for **${track?.info.title || "Unknown"}**. Skipping to next...`).catch(() => null);
       }
     }
     await player.skip().catch(() => null);
@@ -112,7 +118,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
     if (player.textChannelId) {
       const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
       if (channel) {
-        await channel.send(`❌ Failed to play track: **${(track as any)?.info?.title || "Unknown"}**.`).catch(() => null);
+        await channel.send(`Failed to play track: **${(track as any)?.info?.title || "Unknown"}**.`).catch(() => null);
       }
     }
     await player.skip().catch(() => null);
@@ -121,12 +127,20 @@ export function registerLavalinkEvents(client: MusicClient): void {
   // Player disconnected from Voice Channel
   lavalink.on("playerDisconnect", async (player: Player) => {
     const customData = getCustomData(player);
-    if (customData.mode247) {
-      try {
-        await player.connect();
-      } catch {
-        // Disconnect handled
-      }
+    const settings = getGuildSettings(player.guildId);
+    if (customData.mode247 || settings.mode247) {
+      setTimeout(async () => {
+        try {
+          const targetVc = player.voiceChannelId || settings.voiceChannelId;
+          if (targetVc) {
+            player.voiceChannelId = targetVc;
+            await player.connect();
+            console.log(`[24/7] Reconnected to voice channel after disconnect in guild ${player.guildId}`);
+          }
+        } catch {
+          // Reconnect attempt handled
+        }
+      }, 3000);
     }
   });
 

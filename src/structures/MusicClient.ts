@@ -11,10 +11,11 @@ import {
 } from "discord.js";
 import { LavalinkManager, type SearchPlatform } from "lavalink-client";
 import { config, type BotConfig } from "../config.js";
-import { type Command, getCustomData } from "../types/index.js";
+import { type Command, getCustomData, setCustomData } from "../types/index.js";
 import { registerLavalinkEvents } from "./LavalinkEvents.js";
 import { handleButtonInteraction } from "../interactions/buttonHandler.js";
 import { allCommands } from "../commands/index.js";
+import { getGuildSettings, getAll247Guilds } from "../utils/guildSettings.js";
 
 export class MusicClient extends Client {
   public lavalink: LavalinkManager;
@@ -101,6 +102,9 @@ export class MusicClient extends Client {
 
       // Register Slash Commands globally
       await this.deploySlashCommands();
+
+      // Auto-reconnect to all active 24/7 voice channels
+      await this.reconnect247Guilds();
     });
 
     // Interaction (Slash Command / Button) Event
@@ -110,7 +114,7 @@ export class MusicClient extends Client {
           const command = this.commands.get(interaction.commandName);
           if (!command) {
             await interaction.reply({
-              content: "❌ Command not found.",
+              content: "Command not found.",
               flags: MessageFlags.Ephemeral,
             });
             return;
@@ -123,7 +127,7 @@ export class MusicClient extends Client {
       } catch (error) {
         console.error(`[Interaction] Error handling ${interaction.id}:`, error);
         if (interaction.isRepliable()) {
-          const msg = { content: "⚠️ There was an error executing this command!", flags: MessageFlags.Ephemeral as any };
+          const msg = { content: "There was an error executing this command.", flags: MessageFlags.Ephemeral as any };
           if (interaction.replied || interaction.deferred) {
             await interaction.followUp(msg).catch(() => null);
           } else {
@@ -140,7 +144,8 @@ export class MusicClient extends Client {
       if (!player || !player.voiceChannelId) return;
 
       const customData = getCustomData(player);
-      if (customData.mode247) return; // 24/7 mode bypasses empty disconnect
+      const guildSettings = getGuildSettings(guildId);
+      if (customData.mode247 || guildSettings.mode247) return; // 24/7 mode bypasses empty disconnect
 
       const channel = this.channels.cache.get(player.voiceChannelId);
       if (!channel || !channel.isVoiceBased()) return;
@@ -153,6 +158,10 @@ export class MusicClient extends Client {
           const checkPlayer = this.lavalink.getPlayer(guildId);
           if (!checkPlayer || !checkPlayer.voiceChannelId) return;
 
+          const recheckCustom = getCustomData(checkPlayer);
+          const recheckSettings = getGuildSettings(guildId);
+          if (recheckCustom.mode247 || recheckSettings.mode247) return;
+
           const recheckChannel = this.channels.cache.get(checkPlayer.voiceChannelId);
           if (recheckChannel?.isVoiceBased()) {
             const currentHumans = recheckChannel.members.filter((m) => !m.user.bot);
@@ -163,6 +172,48 @@ export class MusicClient extends Client {
         }, this.botConfig.player.autoDisconnectEmptySec * 1000);
       }
     });
+  }
+
+  /**
+   * Automatically restores voice channel connections for guilds with 24/7 mode enabled
+   */
+  public async reconnect247Guilds(): Promise<void> {
+    const list = getAll247Guilds();
+    if (list.length === 0) return;
+
+    console.log(`[24/7] Restoring ${list.length} saved 24/7 voice channel connections...`);
+    for (const item of list) {
+      try {
+        const guild = this.guilds.cache.get(item.guildId);
+        if (!guild) continue;
+
+        const vc = guild.channels.cache.get(item.voiceChannelId);
+        if (!vc || !vc.isVoiceBased()) continue;
+
+        let player = this.lavalink.getPlayer(item.guildId);
+        if (!player) {
+          player = this.lavalink.createPlayer({
+            guildId: item.guildId,
+            voiceChannelId: item.voiceChannelId,
+            textChannelId: item.textChannelId,
+            selfDeaf: true,
+            volume: this.botConfig.player.defaultVolume,
+            instaUpdateFiltersFix: true,
+          });
+        }
+
+        const customData = getCustomData(player);
+        customData.mode247 = true;
+        setCustomData(player, customData);
+
+        if (!player.connected) {
+          await player.connect();
+          console.log(`[24/7] Reconnected to "${vc.name}" in guild "${guild.name}"`);
+        }
+      } catch (err) {
+        console.error(`[24/7] Failed to reconnect guild ${item.guildId}:`, err);
+      }
+    }
   }
 
   public async deploySlashCommands(): Promise<void> {

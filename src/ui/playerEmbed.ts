@@ -15,8 +15,8 @@ export function createPlayerEmbed(player: Player, track?: Track | null) {
 
   if (!current) {
     const emptyEmbed = new EmbedBuilder()
-      .setColor(0x2f3136)
-      .setDescription("🎵 **Queue is empty.** Use `/play` to listen to music!")
+      .setColor(0x2b2d31)
+      .setDescription("Queue is empty. Use `/play` to listen to music.")
       .setFooter({ text: "RealOps Music" });
 
     return { embeds: [emptyEmbed], components: [] };
@@ -24,22 +24,22 @@ export function createPlayerEmbed(player: Player, track?: Track | null) {
 
   const requester = (current.requester as User | undefined) || null;
   const duration = current.info.duration || 0;
-  const durationText = current.info.isStream ? "🔴 Live" : formatDuration(duration);
+  const durationText = current.info.isStream ? "Live" : formatDuration(duration);
 
-  // Active status pills (only shown when enabled, avoiding clutter)
+  // Active status pills (clean text, no emojis)
   const statusBadges: string[] = [];
-  if (player.repeatMode === "track") statusBadges.push("🔂 Repeat Track");
-  if (player.repeatMode === "queue") statusBadges.push("🔁 Repeat Queue");
-  if (customData.autoplay) statusBadges.push("📻 Autoplay");
-  if (customData.mode247) statusBadges.push("⏰ 24/7");
-  if (player.filterManager?.filters.nightcore) statusBadges.push("🌙 Nightcore");
-  if (player.filterManager?.filters.vaporwave) statusBadges.push("🌊 Vaporwave");
-  if (player.filterManager?.filters.rotation) statusBadges.push("🎧 8D");
+  if (player.repeatMode === "track") statusBadges.push("Loop: Track");
+  if (player.repeatMode === "queue") statusBadges.push("Loop: Queue");
+  if (customData.autoplay) statusBadges.push("Autoplay: On");
+  if (customData.mode247) statusBadges.push("24/7: On");
+  if (player.filterManager?.filters.nightcore) statusBadges.push("Filter: Nightcore");
+  if (player.filterManager?.filters.vaporwave) statusBadges.push("Filter: Vaporwave");
+  if (player.filterManager?.filters.rotation) statusBadges.push("Filter: 8D");
 
   const badgeLine = statusBadges.length > 0 ? `\n\n\`${statusBadges.join(" • ")}\`` : "";
 
   const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
+    .setColor(0x2b2d31)
     .setAuthor({ name: "Now Playing" })
     .setTitle(truncate(current.info.title, 60))
     .setURL(current.info.uri || "https://discord.com")
@@ -53,34 +53,38 @@ export function createPlayerEmbed(player: Player, track?: Track | null) {
     embed.setThumbnail(current.info.artworkUrl);
   }
 
-  // Single clean row of 5 essential controls
+  // Clean, sleek controls without emojis
   const controls = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("btn_previous")
-      .setEmoji("⏮️")
+      .setLabel("Previous")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(player.queue.previous.length === 0),
 
     new ButtonBuilder()
       .setCustomId("btn_playpause")
-      .setEmoji(player.paused ? "▶️" : "⏸️")
       .setLabel(player.paused ? "Resume" : "Pause")
       .setStyle(player.paused ? ButtonStyle.Success : ButtonStyle.Primary),
 
     new ButtonBuilder()
       .setCustomId("btn_skip")
-      .setEmoji("⏭️")
       .setLabel("Skip")
       .setStyle(ButtonStyle.Secondary),
 
     new ButtonBuilder()
       .setCustomId("btn_loop")
-      .setEmoji("🔁")
+      .setLabel(
+        player.repeatMode === "track"
+          ? "Loop: Track"
+          : player.repeatMode === "queue"
+          ? "Loop: Queue"
+          : "Loop"
+      )
       .setStyle(player.repeatMode !== "off" ? ButtonStyle.Success : ButtonStyle.Secondary),
 
     new ButtonBuilder()
       .setCustomId("btn_stop")
-      .setEmoji("⏹️")
+      .setLabel("Stop")
       .setStyle(ButtonStyle.Danger)
   );
 

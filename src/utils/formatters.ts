@@ -69,7 +69,7 @@ export function createProgressBar(
   size = 14
 ): string {
   if (!totalMs || totalMs <= 0 || totalMs === Infinity) {
-    return "🔴 Live Stream";
+    return "Live Stream";
   }
 
   const progress = Math.min(Math.max(currentMs / totalMs, 0), 1);
