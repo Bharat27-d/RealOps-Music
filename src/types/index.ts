@@ -26,6 +26,7 @@ export interface PlayerCustomData {
   trackStartedAt?: number;        // Unix ms when current track started playing
   lastCleanEndId?: string | null; // Identifier of track that last ended via trackEnd (cleanly)
   queueEndedAt?: number;          // Unix ms when queueEnd last fired
+  fallbackActive?: boolean;       // True if currently playing a fallback track
 }
 
 export function getCustomData(player: any): PlayerCustomData {

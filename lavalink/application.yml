@@ -63,11 +63,15 @@ plugins:
     allowDirectVideoIds: true
     allowDirectPlaylistIds: true
     clients:
-      - TVHTML5_SIMPLY
       - TV
-      - ANDROID_VR
-      - MUSIC
+      - MWEB
       - WEB
+      - MUSIC
+      - WEBEMBEDDED
+      - ANDROID_VR
+      - TVHTML5_SIMPLY
+      - IOS
+      - ANDROID_MUSIC
 
   lavasrc:
     providers:

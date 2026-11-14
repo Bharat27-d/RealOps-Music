@@ -16,6 +16,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
     const customData = getCustomData(player);
     customData.trackStartedAt = Date.now();
     customData.lastCleanEndId = undefined;
+    customData.fallbackActive = false;
     setCustomData(player, customData);
 
     try {
@@ -172,7 +173,7 @@ export function registerLavalinkEvents(client: MusicClient): void {
     setCustomData(player, customData);
 
     // YouTube track failed at start → try alternative search (ytmsearch or scsearch)
-    if (track && "info" in track && track.info.sourceName === "youtube") {
+    if (!customData.fallbackActive && track && "info" in track && track.info.sourceName === "youtube") {
       try {
         const query = `${track.info.title} ${track.info.author || ""}`.trim();
         // First try YouTube Music keyword search (different video ID / audio stream)
@@ -191,6 +192,9 @@ export function registerLavalinkEvents(client: MusicClient): void {
 
         if (fallbackTrack) {
           console.log(`[Lavalink] Auto-fallback to "${fallbackTrack.info.sourceName}" for: "${track.info.title}"`);
+          customData.fallbackActive = true;
+          setCustomData(player, customData);
+
           if (player.textChannelId) {
             const channel = client.channels.cache.get(player.textChannelId) as TextChannel | undefined;
             if (channel) {
@@ -206,6 +210,10 @@ export function registerLavalinkEvents(client: MusicClient): void {
         console.warn("[Lavalink] Auto-fallback failed:", fallbackErr);
       }
     }
+
+    // Reset fallback flag
+    customData.fallbackActive = false;
+    setCustomData(player, customData);
 
     // True failure — all fallbacks exhausted
     if (player.textChannelId) {
