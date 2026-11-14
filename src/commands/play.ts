@@ -24,8 +24,8 @@ async function searchBestTrack(
   preferSource?: string
 ): Promise<Track | UnresolvedTrack | null> {
   const sources = preferSource
-    ? [preferSource, "ytmsearch", "ytsearch", "scsearch"]
-    : ["ytmsearch", "ytsearch", "scsearch"];
+    ? [preferSource, "scsearch", "ytmsearch", "ytsearch"]
+    : ["scsearch", "ytmsearch", "ytsearch"];
 
   const triedSources = new Set<string>();
 
