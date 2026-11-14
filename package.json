@@ -1,0 +1,29 @@
+{
+  "name": "realops-music",
+  "version": "1.0.0",
+  "description": "Enterprise-grade Discord Music Bot supporting all platforms with Lavalink v4",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["discord", "music-bot", "lavalink", "discordjs", "spotify", "youtube", "soundcloud"],
+  "author": "RealOps",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "lavalink-client": "^2.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+
