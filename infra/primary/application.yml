@@ -120,10 +120,10 @@ plugins:
     # 3. YouTube standard search by artist + title
     # 4. SoundCloud search by artist + title
     providers:
+      - "scsearch:%QUERY%"
       - "ytmsearch:%QUERY%"
       - "ytsearch:\"%ISRC%\""
       - "ytsearch:%QUERY%"
-      - "scsearch:%QUERY%"
 
     sources:
       spotify: true

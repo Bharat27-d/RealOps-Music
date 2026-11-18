@@ -163,6 +163,7 @@ export async function handleTrackFailure(
 
       // When YouTube fails, query SoundCloud directly to guarantee an actual alternative source is used
       if (isYouTubeSource) {
+        // Attempt 1: SoundCloud with cleaned title (+ author if not a label)
         try {
           const node = lavalinkService.getNode('default');
           const scRes = await node.rest.resolve(`scsearch:${fallbackQuery}`);
@@ -173,12 +174,14 @@ export async function handleTrackFailure(
             scRes.data.length > 0
           ) {
             mirrorTrack = normalizeTrack(scRes.data[0]!);
+          } else {
+            log.warn({ guildId, fallbackQuery, loadType: scRes?.loadType }, 'SoundCloud search returned no results');
           }
         } catch (scErr) {
-          log.debug({ guildId, fallbackQuery, scErr }, 'Direct SoundCloud search failed');
+          log.warn({ guildId, fallbackQuery, scErr }, 'Direct SoundCloud search failed with error');
         }
 
-        // Try cleanTitle alone on SoundCloud if query with author returned nothing
+        // Attempt 2: SoundCloud with cleanTitle only (drop author)
         if (!mirrorTrack && fallbackQuery !== cleanTitle) {
           try {
             const node = lavalinkService.getNode('default');
@@ -190,9 +193,35 @@ export async function handleTrackFailure(
               scRes2.data.length > 0
             ) {
               mirrorTrack = normalizeTrack(scRes2.data[0]!);
+            } else {
+              log.warn({ guildId, cleanTitle, loadType: scRes2?.loadType }, 'SoundCloud title-only search returned no results');
             }
           } catch {
             // non-fatal
+          }
+        }
+
+        // Attempt 3: Spotify catalog search via LavaSrc (resolves to SoundCloud first per provider order)
+        if (!mirrorTrack) {
+          try {
+            const node = lavalinkService.getNode('default');
+            const spRes = await node.rest.resolve(`spsearch:${cleanTitle}`);
+            if (
+              spRes &&
+              spRes.loadType === LoadType.SEARCH &&
+              Array.isArray(spRes.data) &&
+              spRes.data.length > 0
+            ) {
+              mirrorTrack = normalizeTrack(spRes.data[0]!);
+              log.info(
+                { guildId, cleanTitle, source: mirrorTrack.sourceName },
+                'Found track via Spotify catalog — will resolve audio at playback via LavaSrc',
+              );
+            } else {
+              log.warn({ guildId, cleanTitle }, 'Spotify catalog search also returned no results');
+            }
+          } catch (spErr) {
+            log.warn({ guildId, cleanTitle, spErr }, 'Spotify catalog search failed');
           }
         }
       }
