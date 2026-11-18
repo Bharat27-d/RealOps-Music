@@ -1,0 +1,66 @@
+# Production Docker Compose for Primary Node (Hetzner)
+#
+# HARD RULES ENFORCED:
+# 1. Lavalink port is NEVER bound to 0.0.0.0 (public internet).
+#    It is bound strictly to 127.0.0.1 on the host for local administrative use,
+#    and accessed by the bot over the isolated internal docker bridge network.
+# 2. Lavalink image is pinned to 4.2.2 (Discord DAVE E2EE voice protocol support).
+# 3. Non-root execution for the bot container.
+
+services:
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4.2.2
+    container_name: realops-lavalink-primary
+    restart: unless-stopped
+    environment:
+      - JAVA_TOOL_OPTIONS=${LAVALINK_JVM_OPTS:--Xmx2G -XX:+UseG1GC}
+      - LAVALINK_SERVER_PASSWORD=${LAVALINK_SERVER_PASSWORD:-youshallnotpass}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID:-}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET:-}
+      - YOUTUBE_OAUTH_REFRESH_TOKEN=${YOUTUBE_OAUTH_REFRESH_TOKEN:-}
+      - YOUTUBE_PO_TOKEN=${YOUTUBE_PO_TOKEN:-}
+      - YOUTUBE_VISITOR_DATA=${YOUTUBE_VISITOR_DATA:-}
+      - HETZNER_IPV6_BLOCK=${HETZNER_IPV6_BLOCK:-}
+    volumes:
+      - ./infra/primary/application.yml:/opt/Lavalink/application.yml:ro
+      - lavalink-plugins:/opt/Lavalink/plugins
+      - ./logs/lavalink:/opt/Lavalink/logs
+    ports:
+      # Bound EXCLUSIVELY to loopback (127.0.0.1). Never bind to 0.0.0.0!
+      - "127.0.0.1:2333:2333"
+    networks:
+      - internal-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2333/version || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: realops-music-bot
+    restart: unless-stopped
+    depends_on:
+      lavalink:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./logs/bot:/app/logs
+    networks:
+      - internal-net
+
+volumes:
+  lavalink-plugins:
+    driver: local
+
+networks:
+  internal-net:
+    driver: bridge
+    internal: false

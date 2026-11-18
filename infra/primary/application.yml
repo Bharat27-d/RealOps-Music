@@ -1,0 +1,156 @@
+# Production Lavalink Configuration — Primary Node (Hetzner)
+# Pinned Lavalink Version: 4.2.2 (First release supporting Discord DAVE voice encryption)
+# Official Docs: https://lavalink.dev/
+# youtube-source Docs: https://github.com/lavalink-devs/youtube-source
+# LavaSrc Docs: https://github.com/topi314/LavaSrc
+
+server:
+  port: 2333
+  address: 0.0.0.0
+  http2:
+    enabled: true
+
+lavalink:
+  plugins:
+    # YouTube Source Plugin (Pinned per Hard Rule 5)
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.2"
+      repository: "https://maven.lavalink.dev/releases"
+      snapshot: false
+    # LavaSrc Plugin (Spotify / Apple Music / Deezer metadata resolver)
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.3"
+      repository: "https://maven.lavalink.dev/releases"
+      snapshot: false
+
+  server:
+    password: "${LAVALINK_SERVER_PASSWORD:youshallnotpass}"
+    sources:
+      youtube: false # HARD RULE 4: Disabled built-in legacy YouTube source in favor of youtube-source plugin
+      bandcamp: true
+      soundcloud: true
+      twitch: false
+      vimeo: false
+      http: true
+      local: false
+
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      distortion: true
+      rotation: true
+      channelMix: true
+      lowPass: true
+
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: HIGH
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    playerUpdateInterval: 5
+    youtubePlaylistLoadLimit: 6
+    youtubeSearchEnabled: true
+    soundcloudSearchEnabled: true
+    gc-warnings: true
+
+    # ─── Option 1: IPv6 Ratelimit / Route Planner on Hetzner ─────────────────
+    # Uses server's assigned IPv6 /64 block to rotate outgoing YouTube requests
+    # per nanosecond offset, cycling away from rate-limited / blocked addresses.
+    # Note: Requires host-level setup via infra/scripts/setup-ipv6.sh
+    ratelimit:
+      ipBlocks: ["${HETZNER_IPV6_BLOCK:2a01:4f8:xxxx:xxxx::/64}"]
+      excludedIps: []
+      strategy: "RotatingNanoSwitch" # Verified option from Lavalink 4.x application.yml.example
+      searchTriggersFail: true
+      retryLimit: -1 # -1 = default lavaplayer retry count
+
+plugins:
+  # ─── youtube-source Plugin Hardening ──────────────────────────────────────
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    # Fallback order of YouTube clients for track loading.
+    # MUSIC provides fast metadata resolution and ytmsearch.
+    # ANDROID_VR, WEB, WEBEMBEDDED, and TVHTML5_SIMPLY provide Opus audio streams.
+    clients:
+      - MUSIC
+      - ANDROID_VR
+      - WEB
+      - WEBEMBEDDED
+      - TVHTML5_SIMPLY
+
+    # Remote Cipher Server (Documented per requirement 2.2):
+    # If YouTube rolls out player script cipher changes that break local parsing,
+    # youtube-source can offload signature deciphering to an external decipher service:
+    #   customCipherServerUrl: "http://cipher-server:8080"
+    # TRADE-OFFS:
+    # - Trust: Player URLs and extracted script data transit third-party infrastructure.
+    # - Availability: If the cipher server degrades or is rate limited, all YouTube loads fail.
+    # Default is commented out (local deciphering using pinned plugin updates).
+
+    # OAuth authentication (Required for age-restricted content & bot mitigation)
+    # Use a THROWAWAY Google account only. Never use a personal account.
+    oauth:
+      enabled: true
+      # Populated from env if already obtained from first-run device flow:
+      refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN:}"
+
+    # Proof of Origin (poToken) & Visitor Data (Optional bot mitigation)
+    # Can also be injected dynamically without restart via POST /youtube REST route
+    pot:
+      token: "${YOUTUBE_PO_TOKEN:}"
+      visitorData: "${YOUTUBE_VISITOR_DATA:}"
+
+  # ─── LavaSrc Plugin (Spotify / External Sources) ──────────────────────────
+  lavasrc:
+    # Ordered fallback list for resolving Spotify metadata to playable audio streams:
+    # 1. Exact ISRC match on YouTube (if track has ISRC metadata)
+    # 2. YouTube Music search by artist + title
+    # 3. YouTube standard search by artist + title
+    # 4. SoundCloud search by artist + title
+    providers:
+      - "ytsearch:\"%ISRC%\""
+      - "ytmsearch:%QUERY%"
+      - "ytsearch:%QUERY%"
+      - "scsearch:%QUERY%"
+
+    sources:
+      spotify: true
+      applemusic: false # Present but disabled by default
+      deezer: false     # Present but disabled by default
+      yandexmusic: false
+      flowerytts: false
+      youtube: false
+      vkmusic: false
+      tidal: false
+      qobuz: false
+
+    spotify:
+      clientId: "${SPOTIFY_CLIENT_ID:}"
+      clientSecret: "${SPOTIFY_CLIENT_SECRET:}"
+      countryCode: "US"
+      playlistLoadLimit: 6
+      albumLoadLimit: 6
+      resolveArtistsInSearch: true
+      localFiles: false
+
+    applemusic:
+      countryCode: "US"
+
+    deezer:
+      formats: ["FLAC", "MP3_320", "MP3_256", "MP3_128"]
+
+logging:
+  file:
+    path: ./logs/lavalink.log
+  level:
+    root: INFO
+    lavalink: INFO
+    dev.lavalink.youtube: INFO
+    dev.lavalink.youtube.http.YoutubeOauth2Handler: INFO
+

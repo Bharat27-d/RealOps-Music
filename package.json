@@ -1,0 +1,33 @@
+{
+  "name": "realops-music",
+  "version": "1.0.0",
+  "description": "Production-grade Discord music bot",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "start": "node --enable-source-maps dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "deploy": "tsx src/scripts/deploy.ts",
+    "deploy:guild": "DEPLOY_GUILD=true tsx src/scripts/deploy.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "shoukaku": "^4.2.0",
+    "zod": "^3.23.8",
+    "pino": "^9.4.0",
+    "pino-pretty": "^11.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "@types/node": "^20.14.12",
+    "tsx": "^4.16.5",
+    "vitest": "^2.0.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

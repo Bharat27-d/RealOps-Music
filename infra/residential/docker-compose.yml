@@ -1,0 +1,43 @@
+# Standalone Docker Compose for Residential Lavalink Node (Node B)
+# Run on: Raspberry Pi / Spare PC / Mini PC on home residential internet.
+#
+# HARD RULES ENFORCED:
+# 1. The Lavalink port (2333) is NEVER exposed to the public internet (0.0.0.0).
+#    It binds strictly to the host's private Tailscale or WireGuard VPN IP:
+#    e.g., TAILSCALE_IP=100.64.0.2 in .env.residential
+# 2. Strong password must be set via LAVALINK_SERVER_PASSWORD.
+# 3. Lavalink pinned to 4.2.2 (Discord DAVE E2EE voice protocol support).
+
+services:
+  lavalink-residential:
+    image: ghcr.io/lavalink-devs/lavalink:4.2.2
+    container_name: realops-lavalink-residential
+    restart: unless-stopped
+    environment:
+      - JAVA_TOOL_OPTIONS=${LAVALINK_JVM_OPTS:--Xmx1536M -XX:+UseG1GC}
+      - LAVALINK_SERVER_PASSWORD=${LAVALINK_SERVER_PASSWORD:?LAVALINK_SERVER_PASSWORD is required}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID:-}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET:-}
+      - YOUTUBE_OAUTH_REFRESH_TOKEN=${YOUTUBE_OAUTH_REFRESH_TOKEN:-}
+      - YOUTUBE_PO_TOKEN=${YOUTUBE_PO_TOKEN:-}
+      - YOUTUBE_VISITOR_DATA=${YOUTUBE_VISITOR_DATA:-}
+    volumes:
+      - ./application.yml:/opt/Lavalink/application.yml:ro
+      - residential-lavalink-plugins:/opt/Lavalink/plugins
+      - ./logs/lavalink:/opt/Lavalink/logs
+    ports:
+      # Bind strictly to the VPN/Tailscale interface IP.
+      # If TAILSCALE_IP is unset, it defaults to 127.0.0.1 (safest fallback).
+      # NEVER CHANGE THIS TO 0.0.0.0:2333!
+      - "${TAILSCALE_IP:-127.0.0.1}:2333:2333"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2333/version || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  residential-lavalink-plugins:
+    driver: local
+

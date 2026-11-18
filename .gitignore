@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+*.log
+*.tsbuildinfo
+node_modules/
+dist/
+.env
+*.log
+*.tsbuildinfo
+.env.local
+
