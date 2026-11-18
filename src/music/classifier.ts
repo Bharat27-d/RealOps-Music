@@ -45,7 +45,10 @@ export function classifyError(raw: unknown): ClassifiedError {
     lower.includes('confirm you\'re not a bot') ||
     lower.includes('bot detection') ||
     lower.includes('account has been terminated') ||
-    lower.includes('action required')
+    lower.includes('action required') ||
+    lower.includes('all clients failed') ||
+    lower.includes('requires login') ||
+    lower.includes('needs to be reloaded')
   ) {
     return {
       category: 'bot_detection',

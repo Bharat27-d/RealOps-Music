@@ -128,5 +128,37 @@ describe('Track Failure Recovery', () => {
 
     expect(handled).toBe(false); // Indicates queue should advance
   });
+
+  it('does not select another YouTube mirror when original YouTube playback is blocked', async () => {
+    vi.spyOn(lavalinkService, 'getNode').mockImplementation(() => {
+      throw new Error('No node');
+    });
+
+    vi.spyOn(resolverModule, 'resolveInput').mockResolvedValue({
+      type: 'search',
+      tracks: [
+        {
+          encoded: 'yt-encoded',
+          identifier: 'yt-id',
+          title: 'Original Song (Mirror)',
+          author: 'Original Artist',
+          duration: 180000,
+          uri: 'https://youtube.com/watch?v=mirror',
+          sourceName: 'youtube',
+          isStream: false,
+        },
+      ],
+    });
+
+    const handled = await handleTrackFailure(mockPlayer, mockQueuedTrack, {
+      type: 'exception',
+      message: 'Sign in to confirm you are not a bot',
+    });
+
+    expect(handled).toBe(false);
+    expect(playTrackMock).not.toHaveBeenCalledWith({
+      track: { encoded: 'yt-encoded' },
+    });
+  });
 });
 

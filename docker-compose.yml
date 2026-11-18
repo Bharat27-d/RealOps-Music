@@ -12,6 +12,7 @@ services:
     image: ghcr.io/lavalink-devs/lavalink:4.2.2
     container_name: realops-lavalink-primary
     restart: unless-stopped
+    user: root
     environment:
       - JAVA_TOOL_OPTIONS=${LAVALINK_JVM_OPTS:--Xmx2G -XX:+UseG1GC}
       - LAVALINK_SERVER_PASSWORD=${LAVALINK_SERVER_PASSWORD:-youshallnotpass}
@@ -31,12 +32,12 @@ services:
     networks:
       - internal-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2333/version || exit 1"]
+      test: ["CMD-SHELL", "wget --header='Authorization: ${LAVALINK_SERVER_PASSWORD:-youshallnotpass}' -qO- http://127.0.0.1:2333/version || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 20s
-
+  
   bot:
     build:
       context: .
@@ -44,8 +45,7 @@ services:
     container_name: realops-music-bot
     restart: unless-stopped
     depends_on:
-      lavalink:
-        condition: service_healthy
+      - lavalink
     env_file:
       - path: .env
         required: false

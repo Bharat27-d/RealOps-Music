@@ -300,5 +300,86 @@ describe('Music Input Resolver', () => {
       expect(res.message).toMatch(/Audio server is currently unavailable/i);
     });
   });
+
+  describe('YouTube Fallback & Resilience', () => {
+    it('recovers via YouTube Music when standard YouTube URL returns LoadType.ERROR', async () => {
+      const mockTrack = createMockTrack('Tere Bin', 'Rabbi Shergil');
+      const resolveMock = vi.fn().mockImplementation((targetUrl: string) => {
+        if (targetUrl === 'https://www.youtube.com/watch?v=5VaqiH1QMTw') {
+          return Promise.resolve({
+            loadType: LoadType.ERROR,
+            data: {
+              message: 'Client [WEB] failed: This video requires login',
+              severity: 'suspicious',
+              cause: 'login_required',
+            },
+          });
+        }
+        if (targetUrl === 'https://music.youtube.com/watch?v=5VaqiH1QMTw') {
+          return Promise.resolve({
+            loadType: LoadType.TRACK,
+            data: mockTrack,
+          });
+        }
+        return Promise.resolve({ loadType: LoadType.EMPTY, data: {} });
+      });
+
+      const mockNode = {
+        rest: { resolve: resolveMock },
+      } as unknown as Node;
+
+      vi.spyOn(lavalinkService, 'getNode').mockReturnValue(mockNode);
+
+      const res = await resolveInput('https://www.youtube.com/watch?v=5VaqiH1QMTw');
+      expect(res.type).toBe('track');
+      if (res.type === 'track') {
+        expect(res.track.title).toBe('Tere Bin');
+        expect(res.track.author).toBe('Rabbi Shergil');
+      }
+      expect(resolveMock).toHaveBeenCalledWith('https://www.youtube.com/watch?v=5VaqiH1QMTw');
+      expect(resolveMock).toHaveBeenCalledWith('https://music.youtube.com/watch?v=5VaqiH1QMTw');
+    });
+
+    it('falls back to oEmbed metadata and search when both direct URL and YouTube Music fail', async () => {
+      const mockFoundTrack = createMockTrack('Taare', 'Farak');
+      const resolveMock = vi.fn().mockImplementation((targetUrl: string) => {
+        if (targetUrl.includes('ytmsearch:')) {
+          return Promise.resolve({
+            loadType: LoadType.SEARCH,
+            data: [mockFoundTrack],
+          });
+        }
+        return Promise.resolve({
+          loadType: LoadType.ERROR,
+          data: {
+            message: 'All clients failed to load the item',
+            severity: 'fault',
+            cause: 'all_clients_failed',
+          },
+        });
+      });
+
+      const mockNode = {
+        rest: { resolve: resolveMock },
+      } as unknown as Node;
+
+      vi.spyOn(lavalinkService, 'getNode').mockReturnValue(mockNode);
+
+      // Mock global fetch for oEmbed
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          title: 'Farak - Taare | Official Music Video |',
+          author_name: 'Farak',
+        }),
+      } as unknown as Response);
+
+      const res = await resolveInput('https://www.youtube.com/watch?v=U0EI7XFkkV4');
+      expect(res.type).toBe('track');
+      if (res.type === 'track') {
+        expect(res.track.title).toBe('Taare');
+      }
+    });
+  });
 });
 

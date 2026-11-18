@@ -1,8 +1,10 @@
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Client, Collection } from 'discord.js';
 import { childLogger } from './core/logger.js';
 import { createClient } from './core/client.js';
 import { registerProcessHandlers } from './core/process.js';
-import { loadCommands, loadEvents, resolveFromRoot, type Command } from './core/loader.js';
+import { loadCommands, loadEvents, type Command } from './core/loader.js';
 import { env } from './config/env.js';
 import { lavalinkService } from './lavalink/index.js';
 import { playerManager } from './music/index.js';
@@ -28,8 +30,9 @@ async function main(): Promise<void> {
 
   registerProcessHandlers(client);
 
-  const commandsDir = resolveFromRoot('src', 'commands');
-  const eventsDir = resolveFromRoot('src', 'events');
+  const __dirname = fileURLToPath(new URL('.', import.meta.url));
+  const commandsDir = join(__dirname, 'commands');
+  const eventsDir = join(__dirname, 'events');
 
   await loadCommands(client, commandsDir);
   await loadEvents(client, eventsDir);

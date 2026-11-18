@@ -40,6 +40,9 @@ function getFiles(dir: string, extensions: string[]): string[] {
   const results: string[] = [];
   try {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.endsWith('.d.ts') || entry.name.endsWith('.map')) {
+        continue;
+      }
       const fullPath = join(dir, entry.name);
       if (entry.isDirectory()) {
         results.push(...getFiles(fullPath, extensions));

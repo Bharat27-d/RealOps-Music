@@ -60,12 +60,13 @@ lavalink:
     # Uses server's assigned IPv6 /64 block to rotate outgoing YouTube requests
     # per nanosecond offset, cycling away from rate-limited / blocked addresses.
     # Note: Requires host-level setup via infra/scripts/setup-ipv6.sh
-    ratelimit:
-      ipBlocks: ["${HETZNER_IPV6_BLOCK:2a01:4f8:xxxx:xxxx::/64}"]
-      excludedIps: []
-      strategy: "RotatingNanoSwitch" # Verified option from Lavalink 4.x application.yml.example
-      searchTriggersFail: true
-      retryLimit: -1 # -1 = default lavaplayer retry count
+    # Uncomment the block below ONLY after running setup-ipv6.sh and setting HETZNER_IPV6_BLOCK:
+    # ratelimit:
+    #   ipBlocks: ["${HETZNER_IPV6_BLOCK}"]
+    #   excludedIps: []
+    #   strategy: "RotatingNanoSwitch"
+    #   searchTriggersFail: true
+    #   retryLimit: -1
 
 plugins:
   # ─── youtube-source Plugin Hardening ──────────────────────────────────────
@@ -79,10 +80,14 @@ plugins:
     # ANDROID_VR, WEB, WEBEMBEDDED, and TVHTML5_SIMPLY provide Opus audio streams.
     clients:
       - MUSIC
+      - ANDROID_MUSIC
+      - TVHTML5_SIMPLY
+      - TV
+      - ANDROID
+      - MWEB
+      - WEBEMBEDDED
       - ANDROID_VR
       - WEB
-      - WEBEMBEDDED
-      - TVHTML5_SIMPLY
 
     # Remote Cipher Server (Documented per requirement 2.2):
     # If YouTube rolls out player script cipher changes that break local parsing,
@@ -99,6 +104,7 @@ plugins:
       enabled: true
       # Populated from env if already obtained from first-run device flow:
       refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN:}"
+      skipInitialization: true
 
     # Proof of Origin (poToken) & Visitor Data (Optional bot mitigation)
     # Can also be injected dynamically without restart via POST /youtube REST route
@@ -109,13 +115,13 @@ plugins:
   # ─── LavaSrc Plugin (Spotify / External Sources) ──────────────────────────
   lavasrc:
     # Ordered fallback list for resolving Spotify metadata to playable audio streams:
-    # 1. Exact ISRC match on YouTube (if track has ISRC metadata)
-    # 2. YouTube Music search by artist + title
+    # 1. YouTube Music search by artist + title (uses reliable WEB_REMIX client)
+    # 2. Exact ISRC match on YouTube (if track has ISRC metadata)
     # 3. YouTube standard search by artist + title
     # 4. SoundCloud search by artist + title
     providers:
-      - "ytsearch:\"%ISRC%\""
       - "ytmsearch:%QUERY%"
+      - "ytsearch:\"%ISRC%\""
       - "ytsearch:%QUERY%"
       - "scsearch:%QUERY%"
 

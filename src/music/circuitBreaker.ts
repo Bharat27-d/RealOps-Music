@@ -30,7 +30,7 @@ export class CircuitBreakerManager {
   public readonly cooldownMs: number;
 
   constructor(config: CircuitBreakerConfig = {}) {
-    this.failureThreshold = config.failureThreshold ?? 3;
+    this.failureThreshold = config.failureThreshold ?? 2;
     this.windowMs = config.windowMs ?? 60_000;
     this.cooldownMs = config.cooldownMs ?? 120_000;
   }

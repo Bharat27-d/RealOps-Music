@@ -8,8 +8,9 @@
     "build": "tsc --project tsconfig.json",
     "start": "node --enable-source-maps dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "deploy": "tsx src/scripts/deploy.ts",
-    "deploy:guild": "DEPLOY_GUILD=true tsx src/scripts/deploy.ts",
+    "deploy": "node dist/scripts/deploy.js",
+    "deploy:dev": "tsx src/scripts/deploy.ts",
+    "deploy:guild": "DEPLOY_GUILD=true node dist/scripts/deploy.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -38,9 +38,9 @@ export class GuildPlayer extends EventEmitter {
   public voiceChannelId: string;
   public readonly queue: TrackQueue;
 
-  private readonly shoukaku: Shoukaku;
-  private readonly player: Player;
-  private readonly client: Client;
+  public readonly shoukaku: Shoukaku;
+  public readonly player: Player;
+  public readonly client: Client;
   private readonly log: ReturnType<typeof childLogger>;
 
   private idleTimer: NodeJS.Timeout | null = null;
@@ -302,15 +302,17 @@ export class GuildPlayer extends EventEmitter {
       if (data.reason === 'finished') {
         void this.processQueue();
       } else if (data.reason === 'loadFailed') {
-        this.log.warn({ reason: data.reason }, 'Track loadFailed, advancing queue');
-        void this.processQueue();
+        // Do NOT call processQueue() here! The 'exception' event handler handles
+        // failure recovery via handleTrackFailure and will advance the queue if recovery fails.
+        this.log.warn({ reason: data.reason }, 'Track loadFailed event received; handled by exception event');
       }
     });
 
     this.player.on('exception', (data) => {
       this.log.error({ exception: data.exception }, 'Track exception event received');
-      if (this.queue.current && this.onTrackFailure) {
-        void this.onTrackFailure(this, this.queue.current, {
+      const activeTrack = this.queue.current;
+      if (activeTrack && this.onTrackFailure) {
+        void this.onTrackFailure(this, activeTrack, {
           type: 'exception',
           message: data.exception.message,
           exception: data.exception,

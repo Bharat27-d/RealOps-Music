@@ -1,10 +1,12 @@
+import { LoadType } from 'shoukaku';
 import { type GuildPlayer } from './player.js';
 import { type QueuedTrack } from './queue.js';
 import { classifyError } from './classifier.js';
 import { circuitBreaker } from './circuitBreaker.js';
 import { nodeHealthTracker } from '../lavalink/nodeHealthTracker.js';
 import { lavalinkService } from '../lavalink/service.js';
-import { resolveInput } from './resolver.js';
+import { cleanVideoTitle, resolveInput } from './resolver.js';
+import { normalizeTrack, type ResolvedTrack } from './types.js';
 import { childLogger } from '../core/logger.js';
 import { infoEmbed, warningEmbed } from '../utils/embed.js';
 import { type TextBasedChannel } from 'discord.js';
@@ -113,7 +115,13 @@ export async function handleTrackFailure(
   }
 
   // ── Step B: Retry Once on Same Source ───────────────────────────────────────
-  if (retryState.sameSourceRetries < 1 && classified.isRetryableOnAlternateNode) {
+  // Do NOT retry on the same source if the failure is bot_detection:
+  // if YouTube blocked this IP/client, an immediate identical retry will always fail.
+  if (
+    retryState.sameSourceRetries < 1 &&
+    classified.isRetryableOnAlternateNode &&
+    classified.category !== 'bot_detection'
+  ) {
     retryState.sameSourceRetries++;
     log.info(
       { guildId, track: track.title, retryCount: retryState.sameSourceRetries },
@@ -121,7 +129,7 @@ export async function handleTrackFailure(
     );
 
     try {
-      await (player as unknown as { player: { playTrack(opt: unknown): Promise<void> } }).player.playTrack({
+      await player.player.playTrack({
         track: { encoded: track.encoded },
       });
       return true;
@@ -133,7 +141,9 @@ export async function handleTrackFailure(
   // ── Step C: Multi-Source Fallback (Mirror Resolution) ───────────────────────
   if (retryState.alternateSourceRetries < 1 && classified.isRetryableOnAlternateSource) {
     retryState.alternateSourceRetries++;
-    const fallbackQuery = `${track.title} ${track.author}`.trim();
+    const cleanTitle = cleanVideoTitle(track.title);
+    const isChannelAuthor = /(?:music|official|records|series|channel|vevo|entertainment|label|t-series|tips|sony|zee)/i.test(track.author);
+    const fallbackQuery = isChannelAuthor || !track.author ? cleanTitle : `${cleanTitle} ${track.author}`.trim();
 
     log.info(
       { guildId, query: fallbackQuery, originalSource: track.sourceName },
@@ -146,11 +156,66 @@ export async function handleTrackFailure(
     );
 
     try {
-      // Resolve query using circuit-breaker-aware search (SoundCloud prioritized if YouTube breaker open)
-      const mirrorResult = await resolveInput(fallbackQuery, { guildId });
+      let mirrorTrack: ResolvedTrack | null = null;
+      const isYouTubeSource =
+        track.sourceName === 'youtube' ||
+        track.sourceName.toLowerCase().includes('youtube');
 
-      if (mirrorResult.type === 'search' && mirrorResult.tracks.length > 0) {
-        const mirrorTrack = mirrorResult.tracks[0]!;
+      // When YouTube fails, query SoundCloud directly to guarantee an actual alternative source is used
+      if (isYouTubeSource) {
+        try {
+          const node = lavalinkService.getNode('default');
+          const scRes = await node.rest.resolve(`scsearch:${fallbackQuery}`);
+          if (
+            scRes &&
+            scRes.loadType === LoadType.SEARCH &&
+            Array.isArray(scRes.data) &&
+            scRes.data.length > 0
+          ) {
+            mirrorTrack = normalizeTrack(scRes.data[0]!);
+          }
+        } catch (scErr) {
+          log.debug({ guildId, fallbackQuery, scErr }, 'Direct SoundCloud search failed');
+        }
+
+        // Try cleanTitle alone on SoundCloud if query with author returned nothing
+        if (!mirrorTrack && fallbackQuery !== cleanTitle) {
+          try {
+            const node = lavalinkService.getNode('default');
+            const scRes2 = await node.rest.resolve(`scsearch:${cleanTitle}`);
+            if (
+              scRes2 &&
+              scRes2.loadType === LoadType.SEARCH &&
+              Array.isArray(scRes2.data) &&
+              scRes2.data.length > 0
+            ) {
+              mirrorTrack = normalizeTrack(scRes2.data[0]!);
+            }
+          } catch {
+            // non-fatal
+          }
+        }
+      }
+
+      // If not from SoundCloud or SoundCloud search was empty, try resolveInput excluding YouTube
+      if (!mirrorTrack) {
+        const mirrorResult = await resolveInput(cleanTitle, { guildId });
+        if (mirrorResult.type === 'search' && mirrorResult.tracks.length > 0) {
+          const alt = mirrorResult.tracks.find(
+            (t) => !t.sourceName.toLowerCase().includes('youtube'),
+          );
+
+          // For YouTube-origin failures, NEVER accept another YouTube result.
+          // If no non-YouTube mirror exists, we skip so queue can progress cleanly.
+          if (isYouTubeSource) {
+            mirrorTrack = alt ?? null;
+          } else {
+            mirrorTrack = alt ?? mirrorResult.tracks[0]!;
+          }
+        }
+      }
+
+      if (mirrorTrack) {
         log.info(
           {
             guildId,
@@ -168,7 +233,7 @@ export async function handleTrackFailure(
           requestedAt: queuedTrack.requestedAt,
         };
 
-        await (player as unknown as { player: { playTrack(opt: unknown): Promise<void> } }).player.playTrack({
+        await player.player.playTrack({
           track: { encoded: mirrorTrack.encoded },
         });
 
@@ -178,6 +243,13 @@ export async function handleTrackFailure(
         );
 
         return true;
+      }
+
+      if (isYouTubeSource) {
+        log.warn(
+          { guildId, query: fallbackQuery },
+          'No non-YouTube mirror found for YouTube playback failure; skipping track',
+        );
       }
     } catch (mirrorErr) {
       log.warn({ guildId, err: mirrorErr }, 'Alternate mirror search failed');
@@ -203,8 +275,7 @@ export async function handleTrackFailure(
 
 function notifyPlayerChannel(player: GuildPlayer, message: string): void {
   try {
-    const client = (player as unknown as { client: { channels: { cache: Map<string, unknown> } } }).client;
-    const channel = client.channels.cache.get(player.textChannelId) as TextBasedChannel | undefined;
+    const channel = player.client.channels.cache.get(player.textChannelId) as TextBasedChannel | undefined;
     if (channel && 'send' in channel) {
       void channel.send({ embeds: [warningEmbed(message)] }).catch(() => undefined);
     }
