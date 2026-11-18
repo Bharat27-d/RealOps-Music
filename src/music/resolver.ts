@@ -68,6 +68,9 @@ export function cleanVideoTitle(rawTitle: string): string {
     .replace(/\[[^\]]*\]/gi, '')
     .replace(/\([^)]*(?:official|lyrics?|audio|video|hd|4k|mv|visualizer|remix|edit)[^)]*\)/gi, '')
     .replace(/\(from\s+[^)]*\)/gi, '')
+    // Strip common standalone suffix keywords that break SoundCloud searches
+    .replace(/\b(?:lyrical?|official|audio only|full\s*song|full\s*video|title\s*track|hd|4k)\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 }
 

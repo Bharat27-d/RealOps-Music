@@ -197,21 +197,13 @@ export async function handleTrackFailure(
         }
       }
 
-      // If not from SoundCloud or SoundCloud search was empty, try resolveInput excluding YouTube
-      if (!mirrorTrack) {
+      // For YouTube-source failures: ONLY use SoundCloud — never resolveInput
+      // (resolveInput starts with ytmsearch: which always returns YouTube results that get filtered out)
+      // For other source failures: use resolveInput normally
+      if (!mirrorTrack && !isYouTubeSource) {
         const mirrorResult = await resolveInput(cleanTitle, { guildId });
         if (mirrorResult.type === 'search' && mirrorResult.tracks.length > 0) {
-          const alt = mirrorResult.tracks.find(
-            (t) => !t.sourceName.toLowerCase().includes('youtube'),
-          );
-
-          // For YouTube-origin failures, NEVER accept another YouTube result.
-          // If no non-YouTube mirror exists, we skip so queue can progress cleanly.
-          if (isYouTubeSource) {
-            mirrorTrack = alt ?? null;
-          } else {
-            mirrorTrack = alt ?? mirrorResult.tracks[0]!;
-          }
+          mirrorTrack = mirrorResult.tracks[0]!;
         }
       }
 
